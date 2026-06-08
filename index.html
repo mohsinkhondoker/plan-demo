@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebAIS — Bangladesh Agriculture & Water Intelligence Platform</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --green:#0d3d1e;--green2:#1a6b35;--green3:#2d9e52;--green4:#18a34a;
+  --blue:#0a2a3d;--blue2:#0f4a72;--blue3:#1a7abf;--blue4:#1a7abf;
+  --cyan:#00b89a;--cyan2:#009e85;--amber:#c47f00;--red:#d32f2f;
+  --bg:#ffffff;--bg2:#f7faf8;--bg3:#edf3ef;--surface:#ffffff;
+  --glass:#ffffff;--border:rgba(24,163,74,0.25);
+  --text:#111111;--text2:#555555;--text3:#18a34a;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Segoe UI',system-ui,sans-serif;color:var(--text)}
+
+/* ─── CANVAS LAYER ─── */
+#world{position:fixed;inset:0;z-index:0}
+#particleCanvas{position:fixed;inset:0;z-index:1;pointer-events:none}
+
+/* ─── MAP SCENE ─── */
+#mapScene{position:fixed;top:56px;left:0;right:0;bottom:0;z-index:2;display:flex;transition:all 1.2s cubic-bezier(0.4,0,0.2,1)}
+#mapScene.shifted{right:auto;width:42%}
+#mapContainer{position:relative;width:100%;height:100%;cursor:crosshair;transition:all 1.2s cubic-bezier(0.4,0,0.2,1);filter:hue-rotate(95deg) saturate(2.5) brightness(1.05)}
+#mapScene.shifted #mapContainer{transform:none}
+#mapSvg{width:100%;height:100%;filter:drop-shadow(0 0 30px rgba(77,204,122,0.3))}
+
+/* ─── HALO / SCAN RING ─── */
+#scanRing{position:absolute;inset:-20px;border-radius:50%;border:1px solid var(--cyan);opacity:0;pointer-events:none;animation:none}
+#scanRing.active{animation:scanPulse 2s ease-in-out infinite}
+@keyframes scanPulse{0%,100%{opacity:0;transform:scale(0.95)}50%{opacity:0.5;transform:scale(1.05)}}
+
+/* ─── DISTRICT TOOLTIP ─── */
+#districtTooltip{position:fixed;background:#ffffff;border:1px solid var(--green3);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);pointer-events:none;opacity:0;transition:opacity 0.2s;z-index:20;box-shadow:0 4px 20px rgba(45,158,82,0.15)}
+
+/* ─── TOP HUD ─── */
+#topHud{position:fixed;top:0;left:0;right:0;height:56px;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#ffffff;border-bottom:1px solid var(--border);box-shadow:0 2px 12px rgba(45,158,82,0.1)}
+.hudLogo{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;letter-spacing:1px;color:var(--green4)}
+.hudLogo svg{width:28px;height:28px}
+.hudCenter{display:flex;gap:24px;align-items:center;font-size:12px;color:var(--text2);letter-spacing:0.5px}
+.hudLive{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--green4)}
+.liveDot{width:7px;height:7px;border-radius:50%;background:var(--green4);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+.hudTime{font-size:13px;color:var(--text2);font-variant-numeric:tabular-nums}
+
+/* ─── INSTRUCTION OVERLAY ─── */
+#instruction{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:25;background:#ffffff;border:1px solid var(--border);border-radius:24px;padding:12px 28px;font-size:13px;color:var(--text2);letter-spacing:0.5px;box-shadow:0 4px 16px rgba(45,158,82,0.12);transition:all 0.6s;white-space:nowrap}
+#instruction.hide{opacity:0;pointer-events:none}
+
+/* ─── DASHBOARD PANEL ─── */
+#dashboard{position:fixed;top:56px;right:0;width:58%;height:calc(100vh - 56px);z-index:20;overflow-y:auto;padding:20px 24px;background:#ffffff;border-left:1px solid var(--border);box-shadow:-4px 0 24px rgba(45,158,82,0.08);transform:translateX(100%);transition:transform 1.2s cubic-bezier(0.4,0,0.2,1);scrollbar-width:thin;scrollbar-color:var(--green2) transparent}
+#dashboard.open{transform:translateX(0)}
+
+/* ─── REGION HEADER ─── */
+#regionHeader{display:flex;align-items:center;gap:14px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.regionIcon{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--green2),var(--green3));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.regionName{font-size:22px;font-weight:700;color:var(--green4);letter-spacing:0.5px}
+.regionSub{font-size:12px;color:var(--text2);margin-top:2px}
+.aiTag{margin-left:auto;background:rgba(24,163,74,0.08);border:1px solid rgba(24,163,74,0.35);border-radius:20px;padding:5px 12px;font-size:11px;color:var(--green4);letter-spacing:1px;display:flex;align-items:center;gap:6px}
+.aiTagDot{width:6px;height:6px;border-radius:50%;background:var(--green4);animation:blink 1.5s infinite}
+
+/* ─── STAT GRID ─── */
+.statGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.statCard{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px;position:relative;overflow:hidden;transition:all 0.3s}
+.statCard:hover{border-color:var(--green3);background:rgba(45,158,82,0.08)}
+.statCard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--green3),transparent);opacity:0;transition:opacity 0.3s}
+.statCard:hover::before{opacity:1}
+.statLabel{font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.statVal{font-size:20px;font-weight:700;color:var(--green4);font-variant-numeric:tabular-nums}
+.statUnit{font-size:11px;color:var(--text2);margin-left:3px;font-weight:400}
+.statIcon{position:absolute;right:12px;top:12px;font-size:18px;opacity:0.4}
+
+/* ─── SECTION TITLE ─── */
+.secTitle{font-size:11px;letter-spacing:2px;color:var(--green3);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.secTitle::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+
+/* ─── CIRCULAR PROGRESS ─── */
+.circleRow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.circleCard{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center}
+.circleWrap{position:relative;width:64px;height:64px;margin:0 auto 8px}
+.circleWrap svg{transform:rotate(-90deg)}
+.circleLabel{font-size:10px;color:var(--text2);line-height:1.3}
+.circleVal{font-size:13px;font-weight:700;color:var(--green4)}
+
+/* ─── WATER METER ─── */
+.waterRow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.waterCard{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px}
+.waterTitle{font-size:11px;color:var(--text2);margin-bottom:10px}
+.waterBar{height:120px;background:rgba(0,0,0,0.04);border-radius:8px;position:relative;overflow:hidden;border:1px solid rgba(24,163,74,0.25)}
+.waterFill{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(180deg,rgba(45,158,82,0.5),rgba(24,163,74,0.75));border-radius:0 0 8px 8px;transition:height 1.5s cubic-bezier(0.4,0,0.2,1)}
+.waterWave{position:absolute;top:-8px;left:-10%;width:120%;height:16px;background:rgba(45,158,82,0.35);border-radius:50%;animation:wave 3s ease-in-out infinite}
+@keyframes wave{0%,100%{transform:translateX(0)}50%{transform:translateX(5%)}}
+.waterPct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#ffffff}
+.waterMetrics{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text2)}
+
+/* ─── RAINFALL CHART ─── */
+.rainfallCard{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px}
+.rainfallChart{position:relative;height:80px;display:flex;align-items:flex-end;gap:4px;padding-top:8px}
+.rainBar{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--green3),var(--green2));transition:all 0.5s;position:relative;cursor:pointer}
+.rainBar:hover{background:linear-gradient(180deg,var(--green4),var(--green3));filter:brightness(1.1)}
+.rainBarLabel{font-size:9px;color:var(--text2);text-align:center;margin-top:4px}
+.rainBarVal{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--green3);white-space:nowrap;opacity:0;transition:opacity 0.2s}
+.rainBar:hover .rainBarVal{opacity:1}
+
+/* ─── SOIL HEALTH ─── */
+.soilCard{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px}
+.soilGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.soilItem{background:rgba(0,0,0,0.04);border-radius:8px;padding:8px;text-align:center;border:1px solid var(--border)}
+.soilBar{height:4px;border-radius:2px;margin-top:6px}
+.soilItemLabel{font-size:10px;color:var(--text2)}
+.soilItemVal{font-size:13px;font-weight:600;color:var(--text)}
+
+/* ─── RISK GAUGE ─── */
+.riskCard{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px}
+.riskGaugeWrap{position:relative;width:160px;height:90px;margin:10px auto 0;overflow:hidden}
+.riskGaugeWrap svg{width:160px;height:160px;position:absolute;top:0;left:0}
+.riskLabel{text-align:center;margin-top:6px}
+.riskRow{display:flex;gap:8px;margin-top:10px}
+.riskItem{flex:1;background:rgba(0,0,0,0.04);border-radius:8px;padding:8px;border:1px solid var(--border)}
+.riskItemLabel{font-size:10px;color:var(--text2)}
+.riskDot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+
+/* ─── CROP BADGES ─── */
+.cropCard{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px}
+.cropBadges{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.cropBadge{padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;border:1px solid;transition:all 0.3s;cursor:default}
+.cropBadge:hover{transform:translateY(-2px);filter:brightness(1.2)}
+.cropBadge.primary{background:rgba(45,158,82,0.15);border-color:var(--green3);color:var(--green4)}
+.cropBadge.secondary{background:rgba(24,163,74,0.08);border-color:var(--green3);color:var(--green2)}
+.cropBadge.tertiary{background:rgba(230,168,23,0.15);border-color:var(--amber);color:var(--amber)}
+
+/* ─── AI RECOMMENDATION ─── */
+.aiCard{background:#ffffff;border:1px solid rgba(24,163,74,0.35);border-radius:12px;padding:14px;margin-bottom:16px;position:relative;overflow:hidden;box-shadow:0 2px 12px rgba(24,163,74,0.08)}
+.aiCard::before{content:'';position:absolute;inset:0;background:linear-gradient(45deg,transparent 40%,rgba(0,229,204,0.03));pointer-events:none}
+.aiScanLine{position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(24,163,74,0.07),transparent);animation:aiScan 4s ease-in-out infinite}
+@keyframes aiScan{0%{left:-60%}100%{left:110%}}
+.aiText{font-size:12px;color:var(--text);line-height:1.8;margin-top:8px}
+.aiHighlight{color:var(--green3);font-weight:600}
+
+/* ─── IRRIGATION FLOW ─── */
+.irrigCard{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px}
+.irrigFlow{height:60px;position:relative;margin-top:10px;overflow:hidden}
+.irrigPipe{position:absolute;top:28px;left:0;right:0;height:4px;background:rgba(58,184,240,0.2);border-radius:2px}
+.irrigDrop{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--blue3);top:24px;animation:flowDrop 3s linear infinite}
+@keyframes flowDrop{0%{left:-2%;opacity:0}10%{opacity:1}90%{opacity:1}100%{left:102%;opacity:0}}
+.irrigLabel{position:absolute;font-size:10px;color:var(--text2)}
+.irrigPct{font-size:22px;font-weight:700;color:var(--blue4)}
+
+/* ─── LOADING OVERLAY ─── */
+#loadOverlay{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.8s}
+#loadOverlay.done{opacity:0;pointer-events:none}
+.loadLogo{font-size:28px;font-weight:700;color:var(--green4);letter-spacing:3px;margin-bottom:8px}
+.loadSub{font-size:12px;color:var(--text2);letter-spacing:2px;margin-bottom:40px}
+.loadBar{width:300px;height:2px;background:rgba(77,204,122,0.15);border-radius:1px;overflow:hidden}
+.loadFill{height:100%;width:0;background:linear-gradient(90deg,var(--green3),var(--cyan));border-radius:1px;transition:width 0.05s linear}
+.loadStatus{font-size:11px;color:var(--text2);margin-top:16px;letter-spacing:1px}
+
+/* ─── SCROLLBAR ─── */
+#dashboard::-webkit-scrollbar{width:4px}
+#dashboard::-webkit-scrollbar-track{background:transparent}
+#dashboard::-webkit-scrollbar-thumb{background:var(--green2);border-radius:2px}
+
+/* ─── CULTIVATION PLANNER (FULL SCREEN) ─── */
+#plannerBtn{background:var(--green4);color:#fff;border:none;border-radius:20px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.5px;transition:all 0.3s;font-family:inherit;white-space:nowrap}
+#plannerBtn:hover{background:var(--green3);transform:translateY(-1px);box-shadow:0 4px 14px rgba(24,163,74,0.35)}
+#plannerOverlay{position:fixed;inset:0;z-index:400;background:#f5f8f5;display:flex;flex-direction:column;transform:translateY(100%);transition:transform 0.55s cubic-bezier(0.4,0,0.2,1);pointer-events:none}
+#plannerOverlay.active{transform:translateY(0);pointer-events:all}
+#plannerOverlay.closing{transform:translateY(100%);transition:transform 0.45s cubic-bezier(0.4,0,0.2,1)}
+/* top nav */
+#pNav{height:62px;background:#fff;border-bottom:1px solid rgba(24,163,74,0.15);display:flex;align-items:center;padding:0 28px;gap:20px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,0.04)}
+#pNavClose{background:none;border:1px solid rgba(0,0,0,0.12);border-radius:10px;padding:8px 14px;font-size:13px;color:var(--text2);cursor:pointer;font-family:inherit;transition:all 0.2s;display:flex;align-items:center;gap:6px;flex-shrink:0}
+#pNavClose:hover{border-color:#d32f2f;color:#d32f2f}
+#pProgress{display:flex;align-items:center;flex:1;justify-content:center}
+.pDot{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
+.pDot span{width:34px;height:34px;border-radius:50%;border:2px solid rgba(0,0,0,0.1);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#bbb;transition:all 0.4s;background:#fff}
+.pDot.active span{border-color:var(--green4);background:var(--green4);color:#fff;box-shadow:0 0 0 5px rgba(24,163,74,0.12)}
+.pDot.done span{border-color:var(--green3);background:var(--green3);color:#fff}
+.pDot label{font-size:10px;color:#bbb;font-weight:600;letter-spacing:0.5px;cursor:default}
+.pDot.active label,.pDot.done label{color:var(--green4)}
+.pLine{width:56px;height:2px;background:rgba(0,0,0,0.08);margin-bottom:18px;transition:background 0.4s;flex-shrink:0}
+.pLine.done{background:var(--green4)}
+#pNavNext{background:var(--green4);border:none;border-radius:10px;padding:10px 26px;font-size:13px;font-weight:600;color:#fff;cursor:pointer;font-family:inherit;transition:all 0.3s;flex-shrink:0}
+#pNavNext:hover:not(:disabled){background:var(--green3);box-shadow:0 4px 14px rgba(24,163,74,0.3)}
+#pNavNext:disabled{background:#ddd;color:#aaa;cursor:not-allowed}
+/* screens */
+#pBody{flex:1;overflow:hidden;position:relative}
+.pScreen{position:absolute;inset:0;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity 0.32s,transform 0.35s cubic-bezier(0.4,0,0.2,1);transform:translateX(32px);scrollbar-width:thin;scrollbar-color:var(--green2) transparent}
+.pScreen.active{opacity:1;pointer-events:all;transform:translateX(0)}
+.pScreen.exit{opacity:0;transform:translateX(-32px);pointer-events:none;transition:opacity 0.22s,transform 0.25s}
+/* step 1 */
+#pS1{display:flex;align-items:flex-start;justify-content:center;padding:48px 32px}
+.pS1Inner{width:min(600px,100%)}
+.pStepHeading{font-size:22px;font-weight:700;color:var(--text);margin-bottom:6px}
+.pStepHint{font-size:13px;color:var(--text2);margin-bottom:28px}
+.pLabel{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px}
+.pFormGroup{margin-bottom:20px}
+.pSelect,.pInput{width:100%;border:1.5px solid rgba(0,0,0,0.12);border-radius:12px;padding:13px 16px;font-size:14px;color:var(--text);font-family:inherit;outline:none;transition:all 0.2s;background:#fff}
+.pSelect:focus,.pInput:focus{border-color:var(--green4);box-shadow:0 0 0 3px rgba(24,163,74,0.1)}
+.pAreaRow{display:flex;gap:10px}
+.pAreaRow .pInput{flex:1}
+.pUnit{display:flex;border:1.5px solid rgba(0,0,0,0.12);border-radius:12px;overflow:hidden;flex-shrink:0}
+.pUnitBtn{padding:0 16px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:#fff;color:var(--text2);transition:all 0.2s;font-family:inherit}
+.pUnitBtn.active{background:var(--green4);color:#fff}
+.pSeasonGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.pSeasonCard{border:2px solid rgba(0,0,0,0.08);border-radius:16px;padding:18px 14px;text-align:center;cursor:pointer;transition:all 0.25s;background:#fff}
+.pSeasonCard:hover{border-color:rgba(24,163,74,0.4);background:rgba(24,163,74,0.04)}
+.pSeasonCard.sel{border-color:var(--green4);background:rgba(24,163,74,0.08);box-shadow:0 0 0 3px rgba(24,163,74,0.12)}
+.pSeasonIcon{font-size:28px;margin-bottom:8px}
+.pSeasonName{font-size:13px;font-weight:700;color:var(--text)}
+.pSeasonDesc{font-size:10px;color:var(--text2);margin-top:5px;line-height:1.4}
+/* step 2 drag-drop */
+#pS2{display:flex;height:100%;overflow:hidden}
+#poolPanel{width:58%;border-right:1.5px solid rgba(24,163,74,0.12);padding:28px;overflow-y:auto;background:#fff}
+#planPanel{width:42%;padding:28px;background:#f5f8f5;overflow-y:auto;display:flex;flex-direction:column}
+.panelHdr{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+.panelSub{font-size:11px;color:var(--text2);margin-bottom:20px}
+.dGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.dCard{background:#fff;border:1.5px solid rgba(0,0,0,0.09);border-radius:14px;padding:14px 12px;cursor:grab;transition:all 0.25s;user-select:none;position:relative;text-align:center}
+.dCard:hover{border-color:rgba(24,163,74,0.45);box-shadow:0 6px 20px rgba(24,163,74,0.12);transform:translateY(-3px)}
+.dCard.dragging{opacity:0.25;transform:scale(0.93);cursor:grabbing}
+.dCard.used{opacity:0.35;pointer-events:none}
+.dCardIcon{font-size:32px;margin-bottom:8px}
+.dCardName{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px}
+.dCardMeta{font-size:10px;color:var(--text2);line-height:1.4}
+.dScore{position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;color:var(--green4);background:rgba(24,163,74,0.1);border-radius:6px;padding:2px 6px}
+.dropZone{border:2.5px dashed rgba(24,163,74,0.25);border-radius:16px;flex:1;min-height:180px;padding:14px;transition:all 0.25s}
+.dropZone.over{border-color:var(--green4);background:rgba(24,163,74,0.06);box-shadow:inset 0 0 0 1px rgba(24,163,74,0.2)}
+.dzEmpty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:140px;gap:8px;color:var(--text2);font-size:12px;text-align:center}
+.planItem{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fff;border:1px solid rgba(24,163,74,0.2);border-radius:12px;margin-bottom:8px;animation:piIn 0.3s ease;position:relative}
+@keyframes piIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}
+.piIcon{font-size:24px}
+.piName{font-size:13px;font-weight:700;color:var(--text);flex:1}
+.piMeta{font-size:10px;color:var(--text2)}
+.piDel{position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#ccc;transition:color 0.2s;padding:2px 4px;top:50%;transform:translateY(-50%)}
+.piDel:hover{color:#d32f2f}
+.planCount{font-size:11px;font-weight:600;color:var(--green3);margin-bottom:12px}
+/* step 3 calendar */
+#pS3{padding:36px}
+.calSec{background:#fff;border-radius:18px;padding:24px;margin-bottom:18px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.calTitle{font-size:14px;font-weight:700;color:var(--text);margin-bottom:18px}
+.calWrap{overflow-x:auto}
+.calGrid{display:grid;grid-template-columns:130px repeat(12,1fr);gap:3px;min-width:680px}
+.calHdr{font-size:9px;font-weight:700;color:var(--text2);text-align:center;padding:6px 2px;letter-spacing:0.5px}
+.calLabel{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--text);padding:4px 0}
+.calDot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.calCell{height:32px;border-radius:3px}
+.calCell.on{opacity:0.88;border-radius:2px}
+.calCell.on.fs{border-radius:8px 2px 2px 8px}
+.calCell.on.ls{border-radius:2px 8px 8px 2px}
+.calCell.on.only{border-radius:8px}
+.calGap{height:32px;border-radius:3px;background:rgba(255,180,0,0.12);border:1.5px dashed rgba(200,150,0,0.3)}
+.calGap.fs{border-radius:8px 2px 2px 8px}
+.calGap.ls{border-radius:2px 8px 8px 2px}
+.rotBox{background:rgba(24,163,74,0.06);border:1px solid rgba(24,163,74,0.2);border-radius:12px;padding:14px 16px;font-size:12px;color:var(--text);line-height:1.9}
+/* step 4 outcome */
+#pS4{padding:36px}
+.ocTopGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+.ocBig{background:#fff;border:1px solid rgba(24,163,74,0.18);border-radius:18px;padding:22px 18px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.ocBigIcon{font-size:34px;margin-bottom:8px}
+.ocBigLabel{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.ocBigVal{font-size:28px;font-weight:700;color:var(--green)}
+.ocBigUnit{font-size:11px;color:var(--text2);margin-top:3px}
+.ocCrops{display:flex;flex-direction:column;gap:10px}
+.ocCropRow{background:#fff;border:1px solid rgba(0,0,0,0.07);border-radius:14px;padding:16px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 6px rgba(0,0,0,0.03)}
+.ocCropDot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.ocCropIcon{font-size:26px}
+.ocCropName{font-size:14px;font-weight:700;color:var(--text)}
+.ocCropSub{font-size:11px;color:var(--text2);margin-top:2px}
+.ocCropRight{margin-left:auto;text-align:right}
+.ocCropYield{font-size:15px;font-weight:700;color:var(--green4)}
+.ocCropWater{font-size:10px;color:var(--text2);margin-top:2px}
+.ocYieldBar{height:5px;border-radius:3px;background:rgba(0,0,0,0.06);overflow:hidden;margin-top:8px;width:80px;margin-left:auto}
+.ocYieldFill{height:100%;border-radius:3px;width:0;transition:width 1.1s cubic-bezier(0.4,0,0.2,1)}
+.soilSection{background:#fff;border-radius:16px;padding:20px;margin-top:20px;box-shadow:0 2px 6px rgba(0,0,0,0.04)}
+.soilSTitle{font-size:13px;font-weight:700;color:var(--text);margin-bottom:14px}
+.soilBars{display:flex;flex-direction:column;gap:10px}
+.soilBarRow{display:flex;align-items:center;gap:12px}
+.soilBarLabel{font-size:11px;color:var(--text2);width:110px;flex-shrink:0}
+.soilBarTrack{flex:1;height:6px;border-radius:3px;background:rgba(0,0,0,0.06);overflow:hidden}
+.soilBarFill{height:100%;border-radius:3px;width:0;transition:width 1.2s cubic-bezier(0.4,0,0.2,1)}
+.soilBarVal{font-size:11px;font-weight:700;color:var(--green4);width:36px;text-align:right;flex-shrink:0}
+
+/* ─── SELECTION GLOW ─── */
+.district-path{cursor:pointer;transition:all 0.3s;fill:rgba(45,158,82,0.15);stroke:rgba(77,204,122,0.4);stroke-width:0.8}
+.district-path:hover{fill:rgba(45,158,82,0.35);stroke:rgba(77,204,122,0.8);stroke-width:1.2;filter:drop-shadow(0 0 8px rgba(77,204,122,0.6))}
+.district-path.selected{fill:rgba(77,204,122,0.25);stroke:var(--green4);stroke-width:1.5;animation:distPulse 2s ease-in-out infinite;filter:drop-shadow(0 0 12px rgba(77,204,122,0.7))}
+@keyframes distPulse{0%,100%{opacity:0.8;filter:drop-shadow(0 0 8px rgba(77,204,122,0.5))}50%{opacity:1;filter:drop-shadow(0 0 18px rgba(77,204,122,0.9))}}
+.river-path{fill:none;stroke:rgba(58,184,240,0.5);stroke-width:0.8;animation:riverGlow 4s ease-in-out infinite}
+@keyframes riverGlow{0%,100%{stroke:rgba(58,184,240,0.4);stroke-width:0.8}50%{stroke:rgba(58,184,240,0.8);stroke-width:1.2}}
+
+/* ─── COUNTER ANIMATION ─── */
+.counting{animation:countUp 0.1s ease-out}
+
+/* ─── PARTICLE EFFECTS ─── */
+@keyframes float{0%{transform:translateY(0) rotate(0deg);opacity:0}10%{opacity:0.6}90%{opacity:0.6}100%{transform:translateY(-200px) rotate(360deg);opacity:0}}
+
+/* map zoom box */
+#zoomBox{position:absolute;background:rgba(0,229,204,0.04);border:1px solid rgba(0,229,204,0.4);pointer-events:none;display:none;border-radius:4px}
+
+/* ─── CARD DETAIL MODAL ─── */
+#cardModal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;pointer-events:none;transition:background 0.4s}
+#cardModal.active{background:rgba(10,30,15,0.45);pointer-events:all}
+#cardModal.active{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#cardModalInner{background:#fff;border:1px solid var(--border);border-radius:20px;padding:28px 28px 24px;width:min(540px,90vw);max-height:82vh;overflow-y:auto;position:relative;transform:scale(0.82) translateY(28px);opacity:0;transition:transform 0.48s cubic-bezier(0.34,1.56,0.64,1),opacity 0.32s ease;box-shadow:0 32px 80px rgba(30,77,40,0.18),0 8px 24px rgba(0,0,0,0.08)}
+#cardModal.active #cardModalInner{transform:scale(1) translateY(0);opacity:1}
+#cardModal.closing #cardModalInner{transform:scale(0.88) translateY(20px);opacity:0;transition:transform 0.28s ease,opacity 0.22s ease}
+#cardModalClose{position:absolute;top:14px;right:16px;background:none;border:1px solid var(--border);border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:14px;color:var(--text2);display:flex;align-items:center;justify-content:center;transition:all 0.2s;line-height:1;padding:0}
+#cardModalClose:hover{background:var(--red);border-color:var(--red);color:#fff;transform:rotate(90deg)}
+.mTitle{font-size:19px;font-weight:700;color:var(--green);margin-bottom:3px;display:flex;align-items:center;gap:10px;letter-spacing:0.3px}
+.mSub{font-size:12px;color:var(--text2);margin-bottom:18px;letter-spacing:0.3px}
+.mDivider{height:1px;background:linear-gradient(90deg,var(--border),transparent);margin:14px 0}
+.mRow{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(45,158,82,0.08);opacity:0;animation:mRowIn 0.4s ease both}
+.mRow:last-child{border-bottom:none}
+.mLabel{font-size:12px;color:var(--text2);margin-bottom:5px}
+.mVal{font-size:13px;font-weight:700;white-space:nowrap;margin-left:12px;flex-shrink:0}
+.mBar{height:5px;border-radius:3px;background:rgba(0,0,0,0.06);overflow:hidden;width:160px;margin-top:6px}
+.mBarFill{height:100%;border-radius:3px;width:0;transition:width 1s cubic-bezier(0.4,0,0.2,1)}
+.mChip{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:600;border:1px solid;margin:3px 3px 3px 0}
+.mSection{margin-top:18px}
+.mSectionTitle{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--green3);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.mSectionTitle::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+.mAiText{font-size:12.5px;color:var(--text);line-height:2;margin-bottom:14px}
+@keyframes mRowIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* back button */
+#backBtn{position:fixed;top:70px;left:20px;z-index:35;background:#ffffff;border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--text2);cursor:pointer;display:none;align-items:center;gap:6px;letter-spacing:0.5px;transition:all 0.3s;box-shadow:0 2px 8px rgba(45,158,82,0.12)}
+#backBtn:hover{border-color:var(--green3);color:var(--green4)}
+#backBtn.show{display:flex}
+</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+.leaflet-tooltip-custom { background: #ffffff; color: #1e4d28; border: 1px solid #2d9e52; border-radius: 8px; font-weight: 600; box-shadow: 0 2px 8px rgba(45,158,82,0.15); }
+.leaflet-container { background: transparent; font-family: inherit; }
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div id="loadOverlay">
+  <div class="loadLogo">WebAIS</div>
+  <div class="loadSub">AGRICULTURE & WATER INTELLIGENCE SYSTEM</div>
+  <div class="loadBar"><div class="loadFill" id="loadFill"></div></div>
+  <div class="loadStatus" id="loadStatus">Initializing geospatial engine...</div>
+</div>
+
+<!-- PARTICLE CANVAS -->
+<canvas id="particleCanvas"></canvas>
+
+<!-- BACKGROUND CANVAS -->
+<canvas id="world"></canvas>
+
+<!-- TOP HUD -->
+<div id="topHud">
+  <div class="hudLogo">
+    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Wheat stalk -->
+      <line x1="14" y1="26" x2="14" y2="8" stroke="rgba(24,163,74,0.9)" stroke-width="1.4"/>
+      <!-- Wheat grains top -->
+      <ellipse cx="14" cy="7" rx="2.5" ry="3.5" fill="rgba(24,163,74,0.85)" stroke="rgba(24,163,74,1)" stroke-width="0.5"/>
+      <!-- Left grain pairs -->
+      <ellipse cx="11" cy="11" rx="2" ry="3" fill="rgba(24,163,74,0.7)" stroke="rgba(24,163,74,0.9)" stroke-width="0.5" transform="rotate(-30 11 11)"/>
+      <ellipse cx="10.5" cy="16" rx="2" ry="3" fill="rgba(45,158,82,0.65)" stroke="rgba(24,163,74,0.85)" stroke-width="0.5" transform="rotate(-25 10.5 16)"/>
+      <!-- Right grain pairs -->
+      <ellipse cx="17" cy="11" rx="2" ry="3" fill="rgba(24,163,74,0.7)" stroke="rgba(24,163,74,0.9)" stroke-width="0.5" transform="rotate(30 17 11)"/>
+      <ellipse cx="17.5" cy="16" rx="2" ry="3" fill="rgba(45,158,82,0.65)" stroke="rgba(24,163,74,0.85)" stroke-width="0.5" transform="rotate(25 17.5 16)"/>
+      <!-- Leaf -->
+      <path d="M14 20 Q9 18 8 22 Q11 23 14 20Z" fill="rgba(0,200,100,0.6)" stroke="rgba(24,163,74,0.7)" stroke-width="0.5"/>
+    </svg>
+    WebAIS
+  </div>
+  <div class="hudCenter">
+    <span>AGRI-INTELLIGENCE PLATFORM · BANGLADESH</span>
+    <span style="color:var(--border)">|</span>
+    <span>v4.2 INTELLIGENCE</span>
+    <span style="color:var(--border)">|</span>
+    <span>SENTINEL-2 LIVE</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <button id="plannerBtn" onclick="openPlanner()">🌱 Plan Cultivation</button>
+    <div class="hudLive"><div class="liveDot"></div>LIVE DATA</div>
+    <div class="hudTime" id="hudClock">--:--:--</div>
+  </div>
+</div>
+
+<!-- BACK BUTTON -->
+<div id="backBtn" onclick="resetView()">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  Back to Map
+</div>
+
+<!-- MAP SCENE -->
+<div id="mapScene">
+  <div id="mapContainer">
+    <div id="scanRing"></div>
+    <div id="zoomBox"></div>
+    <div id="realMap" style="width:100%;height:100%;z-index:10;background:transparent;overflow:hidden;"></div>
+  </div>
+</div>
+
+<!-- DISTRICT TOOLTIP -->
+<div id="districtTooltip"></div>
+
+<!-- INSTRUCTION -->
+<div id="instruction">🛰 Select any region to open Intelligence Dashboard</div>
+
+<!-- DASHBOARD PANEL -->
+<div id="dashboard">
+  <!-- Region Header -->
+  <div id="regionHeader">
+    <div class="regionIcon" id="regionIcon">🌾</div>
+    <div>
+      <div class="regionName" id="regionName">—</div>
+      <div class="regionSub" id="regionSub">Bangladesh • Agricultural Division</div>
+    </div>
+    <div class="aiTag"><div class="aiTagDot"></div>AI ANALYSIS ACTIVE</div>
+  </div>
+
+  <!-- LAND STATS -->
+  <div class="secTitle">📐 Land Intelligence</div>
+  <div class="statGrid" id="landGrid">
+    <div class="statCard"><div class="statLabel">Total Area</div><div class="statVal"><span class="statCounter" data-val="0">0</span><span class="statUnit">km²</span></div><div class="statIcon">🗺</div></div>
+    <div class="statCard"><div class="statLabel">Cultivable Land</div><div class="statVal"><span class="statCounter" data-val="0">0</span><span class="statUnit">%</span></div><div class="statIcon">🌱</div></div>
+    <div class="statCard"><div class="statLabel">Water Bodies</div><div class="statVal"><span class="statCounter" data-val="0">0</span><span class="statUnit">%</span></div><div class="statIcon">💧</div></div>
+    <div class="statCard"><div class="statLabel">Pond Count</div><div class="statVal"><span class="statCounter" data-val="0">0</span><span class="statUnit">k</span></div><div class="statIcon">🏞</div></div>
+    <div class="statCard"><div class="statLabel">River / Canal</div><div class="statVal"><span class="statCounter" data-val="0">0</span><span class="statUnit">km</span></div><div class="statIcon">🌊</div></div>
+    <div class="statCard"><div class="statLabel">Forest Cover</div><div class="statVal"><span class="statCounter" data-val="0">0</span><span class="statUnit">%</span></div><div class="statIcon">🌳</div></div>
+  </div>
+
+  <!-- CIRCULAR INDICATORS -->
+  <div class="secTitle">⚡ Resource Indicators</div>
+  <div class="circleRow" id="circleRow">
+    <div class="circleCard">
+      <div class="circleWrap">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(77,204,122,0.15)" stroke-width="6"/>
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--green3)" stroke-width="6" stroke-dasharray="163.4" stroke-dashoffset="163.4" id="circ-0" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:13px;font-weight:700;color:var(--green4)" id="circVal-0">0%</span>
+        </div>
+      </div>
+      <div class="circleVal"></div>
+      <div class="circleLabel">Irrigation<br>Coverage</div>
+    </div>
+    <div class="circleCard">
+      <div class="circleWrap">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(58,184,240,0.15)" stroke-width="6"/>
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--blue3)" stroke-width="6" stroke-dasharray="163.4" stroke-dashoffset="163.4" id="circ-1" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:13px;font-weight:700;color:var(--blue4)" id="circVal-1">0%</span>
+        </div>
+      </div>
+      <div class="circleLabel">Groundwater<br>Availability</div>
+    </div>
+    <div class="circleCard">
+      <div class="circleWrap">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(230,168,23,0.15)" stroke-width="6"/>
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--amber)" stroke-width="6" stroke-dasharray="163.4" stroke-dashoffset="163.4" id="circ-2" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:13px;font-weight:700;color:var(--amber)" id="circVal-2">0%</span>
+        </div>
+      </div>
+      <div class="circleLabel">Crop<br>Suitability</div>
+    </div>
+    <div class="circleCard">
+      <div class="circleWrap">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(0,229,204,0.15)" stroke-width="6"/>
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--cyan)" stroke-width="6" stroke-dasharray="163.4" stroke-dashoffset="163.4" id="circ-3" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:13px;font-weight:700;color:var(--cyan)" id="circVal-3">0%</span>
+        </div>
+      </div>
+      <div class="circleLabel">Soil<br>Health Index</div>
+    </div>
+  </div>
+
+  <!-- WATER METERS -->
+  <div class="secTitle">💧 Hydrology Status</div>
+  <div class="waterRow">
+    <div class="waterCard">
+      <div class="waterTitle">Groundwater Level</div>
+      <div class="waterBar">
+        <div class="waterFill" id="gwFill" style="height:0%">
+          <div class="waterWave"></div>
+        </div>
+        <div class="waterPct" id="gwPct">—</div>
+      </div>
+      <div class="waterMetrics">
+        <span id="gwDepth">Depth: —</span><span id="gwTrend">Trend: —</span>
+      </div>
+    </div>
+    <div class="waterCard">
+      <div class="waterTitle">Surface Water Availability</div>
+      <div class="waterBar">
+        <div class="waterFill" id="swFill" style="height:0%;background:linear-gradient(180deg,rgba(45,158,82,0.45),rgba(13,61,30,0.7))">
+          <div class="waterWave" style="background:rgba(45,158,82,0.3)"></div>
+        </div>
+        <div class="waterPct" id="swPct">—</div>
+      </div>
+      <div class="waterMetrics">
+        <span id="swSource">Source: —</span><span id="swSeason">Season: —</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RAINFALL -->
+  <div class="secTitle">🌧 Monthly Rainfall Pattern</div>
+  <div class="rainfallCard">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:11px;color:var(--text2)">Annual: <span id="annualRain" style="color:var(--blue4)">—</span></span>
+      <span style="font-size:11px;color:var(--text2)">Peak Month: <span id="peakMonth" style="color:var(--blue4)">—</span></span>
+    </div>
+    <div class="rainfallChart" id="rainfallChart"></div>
+    <div style="display:flex;gap:0" id="rainfallLabels"></div>
+  </div>
+
+  <!-- SOIL HEALTH -->
+  <div class="secTitle">🌍 Soil Intelligence</div>
+  <div class="soilCard">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:var(--text2)">Soil Type: <span id="soilType" style="color:var(--text);font-weight:600">—</span></span>
+      <span style="font-size:12px;color:var(--text2)">pH: <span id="soilPh" style="color:var(--green4);font-weight:600">—</span></span>
+    </div>
+    <div class="soilGrid" id="soilGrid">
+      <div class="soilItem"><div class="soilItemLabel">Nitrogen</div><div class="soilItemVal" id="soil-n">—</div><div class="soilBar" id="soilbar-n"></div></div>
+      <div class="soilItem"><div class="soilItemLabel">Phosphorus</div><div class="soilItemVal" id="soil-p">—</div><div class="soilBar" id="soilbar-p"></div></div>
+      <div class="soilItem"><div class="soilItemLabel">Potassium</div><div class="soilItemVal" id="soil-k">—</div><div class="soilBar" id="soilbar-k"></div></div>
+      <div class="soilItem"><div class="soilItemLabel">Organic Matter</div><div class="soilItemVal" id="soil-om">—</div><div class="soilBar" id="soilbar-om"></div></div>
+      <div class="soilItem"><div class="soilItemLabel">Moisture</div><div class="soilItemVal" id="soil-m">—</div><div class="soilBar" id="soilbar-m"></div></div>
+      <div class="soilItem"><div class="soilItemLabel">Salinity</div><div class="soilItemVal" id="soil-s">—</div><div class="soilBar" id="soilbar-s"></div></div>
+    </div>
+  </div>
+
+  <!-- RISK ANALYSIS -->
+  <div class="secTitle">⚠ Risk Analysis</div>
+  <div class="riskCard">
+    <div class="riskGaugeWrap">
+      <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20,130 A70,70 0 0,1 140,130" fill="none" stroke="rgba(77,204,122,0.15)" stroke-width="12" stroke-linecap="round"/>
+        <path d="M20,130 A70,70 0 0,1 140,130" fill="none" stroke="url(#riskGrad)" stroke-width="12" stroke-linecap="round" id="riskArc" stroke-dasharray="220" stroke-dashoffset="220"/>
+        <defs>
+          <linearGradient id="riskGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#2d9e52"/>
+            <stop offset="50%" stop-color="#e6a817"/>
+            <stop offset="100%" stop-color="#e63946"/>
+          </linearGradient>
+        </defs>
+        <text x="80" y="120" text-anchor="middle" font-size="18" font-weight="700" fill="var(--text)" id="riskPctTxt">—</text>
+        <text x="80" y="135" text-anchor="middle" font-size="8" fill="rgba(42,125,58,0.7)">Risk Score</text>
+      </svg>
+    </div>
+    <div class="riskLabel"><span style="font-size:14px;font-weight:700" id="riskLevelTxt">—</span></div>
+    <div class="riskRow" id="riskRow">
+      <div class="riskItem"><div class="riskItemLabel"><span class="riskDot" style="background:#e63946"></span>Flood</div><div style="font-size:12px;font-weight:600" id="risk-flood">—</div></div>
+      <div class="riskItem"><div class="riskItemLabel"><span class="riskDot" style="background:#e6a817"></span>Drought</div><div style="font-size:12px;font-weight:600" id="risk-drought">—</div></div>
+      <div class="riskItem"><div class="riskItemLabel"><span class="riskDot" style="background:#3ab8f0"></span>Waterlog</div><div style="font-size:12px;font-weight:600" id="risk-waterlog">—</div></div>
+      <div class="riskItem"><div class="riskItemLabel"><span class="riskDot" style="background:#8a4fff"></span>Salinity</div><div style="font-size:12px;font-weight:600" id="risk-salinity">—</div></div>
+    </div>
+  </div>
+
+  <!-- IRRIGATION FLOW -->
+  <div class="secTitle">🚿 Irrigation System</div>
+  <div class="irrigCard">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:11px;color:var(--text2)">Coverage</div>
+        <div class="irrigPct" id="irrigPct">—</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--text2)">Water Req.</div>
+        <div style="font-size:16px;font-weight:700;color:var(--blue4)" id="waterReq">—</div>
+      </div>
+    </div>
+    <div class="irrigFlow">
+      <div class="irrigPipe"></div>
+      <div class="irrigDrop" style="animation-delay:0s"></div>
+      <div class="irrigDrop" style="animation-delay:1s"></div>
+      <div class="irrigDrop" style="animation-delay:2s"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <div style="flex:1;background:rgba(0,0,0,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;font-size:10px">
+        <div style="color:var(--text2)">Primary Source</div>
+        <div style="color:var(--text);font-weight:600" id="irrigSource">—</div>
+      </div>
+      <div style="flex:1;background:rgba(0,0,0,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;font-size:10px">
+        <div style="color:var(--text2)">Method</div>
+        <div style="color:var(--text);font-weight:600" id="irrigMethod">—</div>
+      </div>
+      <div style="flex:1;background:rgba(0,0,0,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;font-size:10px">
+        <div style="color:var(--text2)">Efficiency</div>
+        <div style="color:var(--green4);font-weight:600" id="irrigEff">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CROP SUITABILITY -->
+  <div class="secTitle">🌾 Crop Suitability Intelligence</div>
+  <div class="cropCard">
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Recommended for this region's soil & climate profile</div>
+    <div class="cropBadges" id="cropBadges"></div>
+  </div>
+
+  <!-- AI RECOMMENDATION -->
+  <div class="secTitle">🤖 AI Recommendation Engine</div>
+  <div class="aiCard">
+    <div class="aiScanLine"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--green4);animation:blink 1.5s infinite"></div>
+      <span style="font-size:11px;color:var(--green4);letter-spacing:1px;font-weight:600">INTELLIGENT ANALYSIS — <span id="aiRegionName">REGION</span></span>
+    </div>
+    <div class="aiText" id="aiText">Loading AI intelligence...</div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap" id="aiActions"></div>
+  </div>
+
+  <div style="height:20px"></div>
+</div>
+
+<!-- CULTIVATION PLANNER (FULL SCREEN) -->
+<div id="plannerOverlay">
+  <!-- top nav -->
+  <div id="pNav">
+    <button id="pNavClose" onclick="closePlanner()">✕ Close</button>
+    <div id="pProgress">
+      <div class="pDot active" data-s="1"><span>1</span><label>Area</label></div>
+      <div class="pLine"></div>
+      <div class="pDot" data-s="2"><span>2</span><label>Build Plan</label></div>
+      <div class="pLine"></div>
+      <div class="pDot" data-s="3"><span>3</span><label>Pattern</label></div>
+      <div class="pLine"></div>
+      <div class="pDot" data-s="4"><span>4</span><label>Outcome</label></div>
+    </div>
+    <button id="pNavNext" onclick="plannerNext()" disabled>Continue →</button>
+  </div>
+  <!-- step screens -->
+  <div id="pBody">
+    <div class="pScreen active" id="pS1"></div>
+    <div class="pScreen" id="pS2">
+      <div id="poolPanel">
+        <div class="panelHdr">🌿 Suggested Crops</div>
+        <div class="panelSub">Drag a crop card into your plan →</div>
+        <div class="dGrid" id="dGrid"></div>
+      </div>
+      <div id="planPanel">
+        <div class="panelHdr">📋 Your Crop Plan</div>
+        <div class="panelSub" id="planSub">Drop crops here to build your pattern</div>
+        <div class="dropZone" id="dropZone"
+          ondragover="event.preventDefault();this.classList.add('over')"
+          ondragleave="this.classList.remove('over')"
+          ondrop="onDrop(event)">
+          <div class="dzEmpty" id="dzEmpty">
+            <div style="font-size:32px">🌱</div>
+            <div>Drag crop cards here<br>to build your plan</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pScreen" id="pS3"></div>
+    <div class="pScreen" id="pS4"></div>
+  </div>
+</div>
+
+<!-- CARD DETAIL MODAL -->
+<div id="cardModal" onclick="handleModalBackdrop(event)">
+  <div id="cardModalInner">
+    <button id="cardModalClose" onclick="closeCardModal(true)">✕</button>
+    <div id="cardModalContent"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   REGION DATA
+═══════════════════════════════════════════════ */
+const REGIONS={
+  rangpur:{name:"Rangpur Division",icon:"🌾",area:16317,cultLand:72,waterBodies:8,ponds:48,rivers:860,forest:3,irrigation:65,groundwater:70,cropSuit:75,soilHealth:68,gwLevel:62,swLevel:55,gwDepth:"4–8m",gwTrend:"Stable",swSource:"Teesta R.",swSeason:"Monsoon",soilType:"Sandy Loam",soilPh:"6.4",nitrogen:68,phosphorus:45,potassium:72,orgMatter:52,moisture:60,salinity:12,rainfall:[18,22,38,72,148,320,410,380,210,82,28,12],riskScore:42,floodRisk:"Moderate",droughtRisk:"Low",waterlogRisk:"Low",salinityRisk:"Very Low",crops:["Boro Rice","Wheat","Maize","Jute","Potato","Mustard","Tobacco"],cropTypes:["primary","primary","primary","secondary","secondary","tertiary","tertiary"],waterReq:"820 mm/yr",irrigSource:"Groundwater",irrigMethod:"STW Pump",irrigEff:"68%",ai:"Rangpur's northern deltaic plains show excellent potential for <span class='aiHighlight'>Boro rice intensification</span>. Soil nitrogen deficiency detected — recommend <span class='aiHighlight'>urea top-dressing</span> in Kharif season. Teesta river water availability is declining; suggest transitioning 20% area to <span class='aiHighlight'>drought-tolerant wheat varieties</span>. Groundwater recharge zones identified near Kurigram; establish <span class='aiHighlight'>3 new aquifer monitoring wells</span>. Cold-wave risk in December–January: deploy <span class='aiHighlight'>micro-irrigation frost protection</span> for potato belt.",aiActions:["Monitor Teesta Flow","Soil Amendment Plan","Cold-Wave Alert System"]},
+  rajshahi:{name:"Rajshahi Division",icon:"🍇",area:18174,cultLand:68,waterBodies:6,ponds:52,rivers:720,forest:5,irrigation:58,groundwater:55,cropSuit:70,soilHealth:60,gwLevel:48,swLevel:40,gwDepth:"6–12m",gwTrend:"Declining",swSource:"Padma R.",swSeason:"Monsoon",soilType:"Clay Loam",soilPh:"6.8",nitrogen:55,phosphorus:60,potassium:65,orgMatter:40,moisture:45,salinity:15,rainfall:[8,12,22,48,92,250,340,290,160,55,14,6],riskScore:58,floodRisk:"Low",droughtRisk:"High",waterlogRisk:"Low",salinityRisk:"Low",crops:["Boro Rice","Mango","Wheat","Silk (Mulberry)","Lentil","Chili","Onion"],cropTypes:["primary","primary","secondary","secondary","secondary","tertiary","tertiary"],waterReq:"650 mm/yr",irrigSource:"Padma River",irrigMethod:"Canal + STW",irrigEff:"55%",ai:"Rajshahi Barind Tract shows <span class='aiHighlight'>critical drought stress</span> — groundwater declining 0.3m/year. Immediate intervention: promote <span class='aiHighlight'>AWD (Alternate Wet & Dry)</span> irrigation to save 30% water. Mango orchards in Chapainawabganj show optimal conditions; recommend <span class='aiHighlight'>precision fertigation</span>. Clay-loam soils have high potassium but low organic matter — integrate <span class='aiHighlight'>green manure crops</span>. Install <span class='aiHighlight'>5 automated weather stations</span> across Barind zone for real-time drought monitoring.",aiActions:["AWD Irrigation Protocol","Drought Emergency Map","Barind Aquifer Report"]},
+  mymensingh:{name:"Mymensingh Division",icon:"🌿",area:10485,cultLand:65,waterBodies:14,ponds:62,rivers:940,forest:8,irrigation:55,groundwater:75,cropSuit:78,soilHealth:72,gwLevel:70,swLevel:68,gwDepth:"3–7m",gwTrend:"Stable",swSource:"Brahmaputra",swSeason:"Year-round",soilType:"Silty Clay",soilPh:"6.2",nitrogen:72,phosphorus:55,potassium:68,orgMatter:65,moisture:72,salinity:8,rainfall:[22,28,52,88,172,380,490,450,240,90,32,16],riskScore:38,floodRisk:"Moderate",droughtRisk:"Very Low",waterlogRisk:"Moderate",salinityRisk:"Very Low",crops:["Boro Rice","Jute","Banana","Pineapple","Turmeric","Ginger","Aquaculture"],cropTypes:["primary","primary","primary","secondary","secondary","secondary","tertiary"],waterReq:"960 mm/yr",irrigSource:"River + Pond",irrigMethod:"Gravity + LLP",irrigEff:"72%",ai:"Mymensingh haor areas have <span class='aiHighlight'>exceptional biodiversity</span> and high soil fertility. Haor flooding window (March–May) limits crop diversity — recommend <span class='aiHighlight'>flash-flood tolerant BRRI dhan51 varieties</span>. High organic matter in silty clay soils supports <span class='aiHighlight'>integrated fish-rice farming</span> — 3,200 ha identified as suitable. Pineapple belt in Madhupur needs <span class='aiHighlight'>precision pH management</span> (target 5.5). Monitor Brahmaputra water levels — flood risk elevated in July–August.",aiActions:["Haor Rice Varieties","Fish-Rice Integration Map","Flood Early Warning"]},
+  sylhet:{name:"Sylhet Division",icon:"🍵",area:12635,cultLand:48,waterBodies:18,ponds:38,rivers:1100,forest:28,irrigation:38,groundwater:80,cropSuit:65,soilHealth:75,gwLevel:82,swLevel:78,gwDepth:"2–5m",gwTrend:"Stable +",swSource:"Surma-Meghna",swSeason:"Year-round",soilType:"Red Sandy",soilPh:"5.2",nitrogen:60,phosphorus:42,potassium:58,orgMatter:78,moisture:82,salinity:5,rainfall:[32,38,78,140,280,520,620,560,340,130,48,24],riskScore:32,floodRisk:"High",droughtRisk:"Very Low",waterlogRisk:"High",salinityRisk:"Very Low",crops:["Tea","Orange","Betel Leaf","Rice","Lemon","Jackfruit","Rubber"],cropTypes:["primary","primary","primary","secondary","secondary","tertiary","tertiary"],waterReq:"1200 mm/yr",irrigSource:"Natural Rain",irrigMethod:"Rain-fed",irrigEff:"N/A",ai:"Sylhet's northeastern hills receive Bangladesh's <span class='aiHighlight'>highest rainfall (4,000+ mm)</span> — optimal for tea cultivation. Acidic red soils (pH 5.2) are perfect for <span class='aiHighlight'>tea, rubber, and citrus</span>. Haor wetlands (Tanguar, Hakaluki) designated as Ramsar sites — <span class='aiHighlight'>sustainable fisheries management</span> critical. Flash flooding from Meghalaya hills is a risk — recommend <span class='aiHighlight'>real-time radar-linked flood alerts</span>. Eco-tourism agriculture integration opportunity identified in Jaflong.",aiActions:["Tea Quality Monitor","Haor Wetland Index","Flash Flood Radar"]},
+  dhaka:{name:"Dhaka Division",icon:"🏙",area:20593,cultLand:55,waterBodies:12,ponds:71,rivers:820,forest:4,irrigation:70,groundwater:58,cropSuit:62,soilHealth:55,gwLevel:52,swLevel:45,gwDepth:"8–15m",gwTrend:"Critical Decline",swSource:"Buriganga R.",swSeason:"Monsoon",soilType:"Alluvial Loam",soilPh:"7.1",nitrogen:48,phosphorus:52,potassium:60,orgMatter:38,moisture:52,salinity:10,rainfall:[12,18,35,62,128,295,380,350,195,72,22,10],riskScore:65,floodRisk:"High",droughtRisk:"Low",waterlogRisk:"High",salinityRisk:"Low",crops:["Boro Rice","Vegetables","Jute","Mustard","Aman Rice","Poultry Integration","Urban Farming"],cropTypes:["primary","primary","secondary","secondary","secondary","tertiary","tertiary"],waterReq:"750 mm/yr",irrigSource:"Groundwater DTW",irrigMethod:"Deep Tubewell",irrigEff:"60%",ai:"Dhaka Division faces <span class='aiHighlight'>critical groundwater depletion</span> — urban expansion reducing recharge zones by 12% annually. Agricultural land conversion risk: <span class='aiHighlight'>18,000 ha threatened by urbanization</span>. Buriganga and Turag rivers show severe pollution — surface water unusable for irrigation. Recommend <span class='aiHighlight'>rooftop and peri-urban farming</span> expansion. High flood waterlogging risk in low-lying chars. Priority action: establish <span class='aiHighlight'>groundwater conservation zones</span> in Gazipur and Manikganj.",aiActions:["Urban Farm Expansion","Groundwater Conservation","Flood Risk Zones"]},
+  khulna:{name:"Khulna Division",icon:"🌲",area:22272,cultLand:52,waterBodies:22,ponds:45,rivers:1260,forest:32,irrigation:45,groundwater:42,cropSuit:58,soilHealth:48,gwLevel:38,swLevel:60,gwDepth:"10–18m",gwTrend:"Saline Intrusion",swSource:"Sundarbans Channels",swSeason:"Tidal",soilType:"Saline Clay",soilPh:"7.8",nitrogen:42,phosphorus:48,potassium:70,orgMatter:35,moisture:65,salinity:85,rainfall:[8,14,28,52,108,240,310,280,155,58,16,6],riskScore:72,floodRisk:"High",droughtRisk:"Moderate",waterlogRisk:"Moderate",salinityRisk:"Critical",crops:["Aman Rice","Shrimp Farming","Coconut","Betel Nut","Saline-tolerant Crops","Mangrove Honey","Crab Culture"],cropTypes:["primary","primary","primary","secondary","secondary","tertiary","tertiary"],waterReq:"580 mm/yr",irrigSource:"Tidal / Rainwater",irrigMethod:"Tidal Sluice",irrigEff:"42%",ai:"Khulna Sundarban fringe is under <span class='aiHighlight'>severe salinity stress</span> — 68% of agricultural land affected. Climate change accelerating saltwater intrusion. Recommend <span class='aiHighlight'>BINA dhan10 and BRRI dhan47</span> salt-tolerant varieties immediately. Shrimp-rice integrated farming (gher system) shows <span class='aiHighlight'>340% higher income</span> vs traditional rice. Mangrove carbon credit programs identified — <span class='aiHighlight'>14,000 ha eligible</span>. Cyclone shelter green belts need expansion. Fresh water pond storage critical for dry season.",aiActions:["Salinity Mapping","Gher Farming Expansion","Cyclone Risk Assessment"]},
+  barisal:{name:"Barisal Division",icon:"🌊",area:13297,cultLand:60,waterBodies:26,ponds:88,rivers:1480,forest:6,irrigation:48,groundwater:65,cropSuit:68,soilHealth:62,gwLevel:60,swLevel:72,gwDepth:"5–10m",gwTrend:"Stable",swSource:"Meghna Delta",swSeason:"Year-round",soilType:"Tidal Alluvial",soilPh:"6.6",nitrogen:62,phosphorus:50,potassium:75,orgMatter:58,moisture:75,salinity:22,rainfall:[15,20,42,75,155,320,410,380,220,82,24,10],riskScore:55,floodRisk:"Very High",droughtRisk:"Low",waterlogRisk:"High",salinityRisk:"Moderate",crops:["Aman Rice","Coconut","Betel Leaf","Banana","Hilsa Fisheries","Duck Farming","Floating Garden"],cropTypes:["primary","primary","primary","secondary","secondary","secondary","tertiary"],waterReq:"880 mm/yr",irrigSource:"River/Khal",irrigMethod:"LLP + Tidal",irrigEff:"58%",ai:"Barisal char lands are home to Bangladesh's unique <span class='aiHighlight'>floating garden (Baira)</span> agriculture — over 60,000 ha suitable for expansion. Meghna estuary provides exceptional fish breeding grounds; integrate <span class='aiHighlight'>hilsa sanctuary protection</span> with aquaculture. Tidal alluvial soils are highly fertile but waterlogging is endemic — promote <span class='aiHighlight'>raised bed vegetable cultivation</span>. Coconut belt along Bhola coastline needs <span class='aiHighlight'>cyclone-resistant varieties</span>. Duck farming in flooded fields offers high-protein food security.",aiActions:["Floating Garden Map","Hilsa Sanctuary Zones","Tidal Agriculture Plan"]},
+  chattogram:{name:"Chattogram Division",icon:"⛰",area:33909,cultLand:44,waterBodies:16,ponds:42,rivers:980,forest:38,irrigation:40,groundwater:60,cropSuit:60,soilHealth:65,gwLevel:58,swLevel:62,gwDepth:"5–12m",gwTrend:"Stable",swSource:"Karnaphuli R.",swSeason:"Monsoon",soilType:"Hilly Red Loam",soilPh:"5.8",nitrogen:58,phosphorus:48,potassium:62,orgMatter:70,moisture:68,salinity:18,rainfall:[18,24,55,110,220,480,580,520,310,120,42,16],riskScore:48,floodRisk:"Moderate",droughtRisk:"Low",waterlogRisk:"Low",salinityRisk:"Moderate",crops:["Tea","Rubber","Bamboo","Pineapple","Turmeric","Hill Rice","Cashew"],cropTypes:["primary","primary","primary","secondary","secondary","secondary","tertiary"],waterReq:"900 mm/yr",irrigSource:"Karnaphuli + Rain",irrigMethod:"Rain-fed + Check Dam",irrigEff:"48%",ai:"Chattogram Hill Tracts offer Bangladesh's most diverse <span class='aiHighlight'>agro-ecological zones</span>. CHT tribal communities practice sustainable jhum cultivation — integrate <span class='aiHighlight'>agroforestry systems</span> to prevent land degradation. Kaptai Lake watershed is critical — regulate upstream agricultural runoff. Tea gardens in Rangamati and Bandarban show <span class='aiHighlight'>premium specialty tea potential</span>. Landslide risk during monsoon (June–September) requires <span class='aiHighlight'>terracing and vetiver grass</span> stabilization. Coastal Cox's Bazar: salt-tolerant vegetable cultivation feasible."},aiActions:["CHT Agroforestry Plan","Landslide Risk Zones","Kaptai Water Quality"]
+};
+
+const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+let selectedRegion=null,dashOpen=false;
+
+/* ═══════════════════════════════════════════════
+   LOADING
+═══════════════════════════════════════════════ */
+const statuses=["Initializing geospatial engine...","Loading satellite imagery...","Calibrating sensor networks...","Processing soil data...","Connecting AI inference...","Rendering hydrological map...","System ready."];
+let loadPct=0;
+const lf=document.getElementById('loadFill'),ls=document.getElementById('loadStatus');
+let si=0;
+const loadInt=setInterval(()=>{
+  loadPct+=Math.random()*3+1;
+  if(loadPct>100)loadPct=100;
+  lf.style.width=loadPct+'%';
+  if(loadPct>si*15&&si<statuses.length){ls.textContent=statuses[si];si++;}
+  if(loadPct>=100){clearInterval(loadInt);setTimeout(()=>{document.getElementById('loadOverlay').classList.add('done');initParticles();initRealMap();setTimeout(()=>{if(map)map.invalidateSize();},700);},600);}
+},40);
+
+/* ═══════════════════════════════════════════════
+   CLOCK
+═══════════════════════════════════════════════ */
+setInterval(()=>{
+  const n=new Date();
+  document.getElementById('hudClock').textContent=n.toLocaleTimeString('en-BD',{hour12:false});
+},1000);
+
+/* ═══════════════════════════════════════════════
+   BACKGROUND CANVAS — terrain + clouds
+═══════════════════════════════════════════════ */
+(function(){
+  const c=document.getElementById('world'),ctx=c.getContext('2d');
+  function resize(){c.width=window.innerWidth;c.height=window.innerHeight;}
+  resize();window.addEventListener('resize',resize);
+  const clouds=Array.from({length:8},()=>({x:Math.random()*window.innerWidth,y:Math.random()*300+50,w:Math.random()*200+100,speed:Math.random()*0.3+0.1,opacity:Math.random()*0.06+0.02}));
+  const drops=Array.from({length:120},()=>({x:Math.random()*window.innerWidth,y:Math.random()*window.innerHeight,vy:Math.random()*3+2,opacity:Math.random()*0.2+0.05}));
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    // White gradient background
+    const g=ctx.createRadialGradient(c.width/2,c.height/2,0,c.width/2,c.height/2,Math.max(c.width,c.height)*0.7);
+    g.addColorStop(0,'#ffffff');g.addColorStop(1,'#f5f5f5');
+    ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);
+    // Terrain texture lines
+    ctx.strokeStyle='rgba(45,158,82,0.04)';ctx.lineWidth=1;
+    for(let i=0;i<c.height;i+=18){ctx.beginPath();ctx.moveTo(0,i);ctx.bezierCurveTo(c.width*0.3,i+Math.sin(i*0.05)*8,c.width*0.7,i-Math.sin(i*0.04)*6,c.width,i+Math.sin(i*0.06)*5);ctx.stroke();}
+    // Clouds
+    clouds.forEach(cl=>{
+      cl.x+=cl.speed;if(cl.x>c.width+200)cl.x=-200;
+      const cg=ctx.createRadialGradient(cl.x,cl.y,0,cl.x,cl.y,cl.w/2);
+      cg.addColorStop(0,`rgba(100,200,150,${cl.opacity})`);cg.addColorStop(1,'transparent');
+      ctx.fillStyle=cg;ctx.beginPath();ctx.ellipse(cl.x,cl.y,cl.w,cl.w*0.4,0,0,Math.PI*2);ctx.fill();
+    });
+    // Rain drops
+    ctx.strokeStyle='rgba(58,184,240,0.15)';ctx.lineWidth=0.8;
+    drops.forEach(d=>{
+      ctx.beginPath();ctx.moveTo(d.x,d.y);ctx.lineTo(d.x-1,d.y+8);ctx.stroke();
+      d.y+=d.vy;if(d.y>c.height){d.y=-10;d.x=Math.random()*c.width;}
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ═══════════════════════════════════════════════
+   PARTICLE SYSTEM — floating agri particles
+═══════════════════════════════════════════════ */
+function initParticles(){
+  const c=document.getElementById('particleCanvas'),ctx=c.getContext('2d');
+  function resize(){c.width=window.innerWidth;c.height=window.innerHeight;}
+  resize();window.addEventListener('resize',resize);
+  const symbols=['🌱','💧','🌾','🍃','⭐','◆'];
+  const ps=Array.from({length:25},()=>({x:Math.random()*window.innerWidth,y:window.innerHeight+20,vy:-(Math.random()*0.8+0.3),vx:(Math.random()-0.5)*0.5,sym:symbols[Math.floor(Math.random()*symbols.length)],size:Math.random()*10+8,life:0,maxLife:Math.random()*400+200,opacity:0}));
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    ps.forEach(p=>{
+      p.life++;if(p.life>p.maxLife){p.life=0;p.y=c.height+20;p.x=Math.random()*c.width;p.opacity=0;}
+      p.y+=p.vy;p.x+=p.vx;
+      const progress=p.life/p.maxLife;
+      p.opacity=progress<0.1?progress*10:progress>0.8?(1-progress)*5:1;
+      ctx.save();ctx.globalAlpha=Math.min(p.opacity*0.4,0.4);
+      ctx.font=`${p.size}px serif`;ctx.fillText(p.sym,p.x,p.y);ctx.restore();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+/* ═══════════════════════════════════════════════
+   MAP INTERACTIONS
+═══════════════════════════════════════════════ */
+
+let map;
+function initRealMap() {
+  map = L.map('realMap', {
+    zoomControl: false,
+    attributionControl: false
+  }).setView([23.6850, 90.3563], 6.4);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  const divisions = {
+    rangpur: { name: "Rangpur Division", lat: 25.7439, lng: 89.2752 },
+    rajshahi: { name: "Rajshahi Division", lat: 24.3636, lng: 88.6241 },
+    mymensingh: { name: "Mymensingh Division", lat: 24.7471, lng: 90.4203 },
+    sylhet: { name: "Sylhet Division", lat: 24.8949, lng: 91.8687 },
+    dhaka: { name: "Dhaka Division", lat: 23.8103, lng: 90.4125 },
+    khulna: { name: "Khulna Division", lat: 22.8456, lng: 89.5403 },
+    barisal: { name: "Barisal Division", lat: 22.7010, lng: 90.3535 },
+    chattogram: { name: "Chattogram Division", lat: 22.3569, lng: 91.7832 }
+  };
+
+  for (let key in divisions) {
+    const div = divisions[key];
+    const marker = L.circleMarker([div.lat, div.lng], {
+      color: '#4dcc7a',
+      fillColor: '#4dcc7a',
+      fillOpacity: 0.6,
+      radius: 12
+    }).addTo(map);
+
+    marker.bindTooltip(div.name, { direction: 'top', permanent: false, className: 'leaflet-tooltip-custom' });
+    marker.on('click', () => { selectRegion(key); });
+  }
+}
+
+function selectRegion(region){
+  selectedRegion=region;
+  document.getElementById('instruction').classList.add('hide');
+  document.getElementById('backBtn').classList.add('show');
+  
+  if(map) {
+    const divisions = {
+      rangpur: [25.7439, 89.2752], rajshahi: [24.3636, 88.6241], mymensingh: [24.7471, 90.4203],
+      sylhet: [24.8949, 91.8687], dhaka: [23.8103, 90.4125], khulna: [22.8456, 89.5403],
+      barisal: [22.7010, 90.3535], chattogram: [22.3569, 91.7832]
+    };
+    map.flyTo(divisions[region], 7.5, { animate: true, duration: 1.2 });
+  }
+
+  document.getElementById('mapScene').classList.add('shifted');
+  setTimeout(()=>{
+    document.getElementById('dashboard').classList.add('open');
+    dashOpen=true;
+    populateDashboard(region);
+    if(map) map.invalidateSize();
+  },600);
+}
+
+function resetView(){
+  document.getElementById('mapScene').classList.remove('shifted');
+  document.getElementById('dashboard').classList.remove('open');
+  dashOpen=false;
+  document.getElementById('instruction').classList.remove('hide');
+  document.getElementById('backBtn').classList.remove('show');
+  selectedRegion=null;
+  if(map) {
+    map.flyTo([23.6850, 90.3563], 6.4, { animate: true, duration: 1.2 });
+    setTimeout(()=>map.invalidateSize(), 1200);
+  }
+}
+
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD POPULATION
+═══════════════════════════════════════════════ */
+function populateDashboard(regionKey){
+  const d=REGIONS[regionKey];if(!d)return;
+  document.getElementById('regionName').textContent=d.name;
+  document.getElementById('regionIcon').textContent=d.icon;
+  document.getElementById('aiRegionName').textContent=d.name.toUpperCase();
+  // Land stats
+  const vals=[d.area,d.cultLand,d.waterBodies,d.ponds,d.rivers,d.forest];
+  document.querySelectorAll('.statCounter').forEach((el,i)=>{
+    animateCounter(el,vals[i]);
+  });
+  // Circular indicators
+  const circVals=[d.irrigation,d.groundwater,d.cropSuit,d.soilHealth];
+  const circColors=['var(--green4)','var(--blue4)','var(--amber)','var(--cyan)'];
+  circVals.forEach((v,i)=>{
+    const circ=document.getElementById('circ-'+i);
+    const val=document.getElementById('circVal-'+i);
+    const offset=163.4*(1-v/100);
+    setTimeout(()=>{circ.style.strokeDashoffset=offset;val.textContent=v+'%';},300+i*100);
+  });
+  // Water meters
+  setTimeout(()=>{
+    document.getElementById('gwFill').style.height=d.gwLevel+'%';
+    document.getElementById('gwPct').textContent=d.gwLevel+'%';
+    document.getElementById('gwDepth').textContent='Depth: '+d.gwDepth;
+    document.getElementById('gwTrend').textContent='Trend: '+d.gwTrend;
+    document.getElementById('swFill').style.height=d.swLevel+'%';
+    document.getElementById('swPct').textContent=d.swLevel+'%';
+    document.getElementById('swSource').textContent='Source: '+d.swSource;
+    document.getElementById('swSeason').textContent='Season: '+d.swSeason;
+  },400);
+  // Rainfall chart
+  buildRainfallChart(d.rainfall);
+  const maxR=Math.max(...d.rainfall);const peakI=d.rainfall.indexOf(maxR);
+  document.getElementById('annualRain').textContent=d.rainfall.reduce((a,b)=>a+b,0)+' mm';
+  document.getElementById('peakMonth').textContent=months[peakI]+' ('+maxR+'mm)';
+  // Soil
+  document.getElementById('soilType').textContent=d.soilType;
+  document.getElementById('soilPh').textContent=d.soilPh;
+  setSoilBar('n',d.nitrogen,'#4dcc7a');setSoilBar('p',d.phosphorus,'#3ab8f0');setSoilBar('k',d.potassium,'#e6a817');
+  setSoilBar('om',d.orgMatter,'#8a4fff');setSoilBar('m',d.moisture,'#00e5cc');setSoilBar('s',d.salinity,'#e63946');
+  // Risk
+  const riskArc=document.getElementById('riskArc');
+  const riskOffset=220*(1-d.riskScore/100);
+  setTimeout(()=>{riskArc.style.strokeDashoffset=riskOffset;},400);
+  document.getElementById('riskPctTxt').textContent=d.riskScore+'%';
+  const riskLevel=d.riskScore<30?'Low Risk':d.riskScore<50?'Moderate Risk':d.riskScore<70?'Elevated Risk':'High Risk';
+  const riskColor=d.riskScore<30?'var(--green4)':d.riskScore<50?'var(--amber)':'var(--red)';
+  document.getElementById('riskLevelTxt').textContent=riskLevel;
+  document.getElementById('riskLevelTxt').style.color=riskColor;
+  document.getElementById('risk-flood').textContent=d.floodRisk;
+  document.getElementById('risk-drought').textContent=d.droughtRisk;
+  document.getElementById('risk-waterlog').textContent=d.waterlogRisk;
+  document.getElementById('risk-salinity').textContent=d.salinityRisk;
+  // Irrigation
+  document.getElementById('irrigPct').textContent=d.irrigation+'%';
+  document.getElementById('waterReq').textContent=d.waterReq;
+  document.getElementById('irrigSource').textContent=d.irrigSource;
+  document.getElementById('irrigMethod').textContent=d.irrigMethod;
+  document.getElementById('irrigEff').textContent=d.irrigEff;
+  // Crops
+  const cb=document.getElementById('cropBadges');cb.innerHTML='';
+  d.crops.forEach((crop,i)=>{
+    const span=document.createElement('span');
+    span.className='cropBadge '+(d.cropTypes[i]||'secondary');
+    const icons={'primary':'🌾','secondary':'🌿','tertiary':'⭐'};
+    span.innerHTML=icons[d.cropTypes[i]||'secondary']+' '+crop;
+    setTimeout(()=>{cb.appendChild(span);},i*80);
+  });
+  // AI
+  document.getElementById('aiText').innerHTML=d.ai;
+  const aa=document.getElementById('aiActions');aa.innerHTML='';
+
+  (d.aiActions||[]).forEach((a,i)=>{
+    const btn=document.createElement('button');
+    btn.style.cssText='background:rgba(24,163,74,0.08);border:1px solid rgba(24,163,74,0.3);border-radius:16px;padding:5px 12px;font-size:11px;color:var(--green3);cursor:pointer;transition:all 0.3s;font-family:inherit';
+    btn.textContent='→ '+a;btn.onmouseover=()=>{btn.style.background='rgba(24,163,74,0.15)';};btn.onmouseout=()=>{btn.style.background='rgba(24,163,74,0.08)';};
+    setTimeout(()=>{aa.appendChild(btn);},i*100);
+  });
+  setTimeout(attachCardClicks,100);
+}
+
+function setSoilBar(id,val,color){
+  document.getElementById('soil-'+id).textContent=val+'%';
+  const bar=document.getElementById('soilbar-'+id);
+  bar.style.background=`linear-gradient(90deg,${color},transparent)`;
+  bar.style.width='0%';bar.style.height='4px';bar.style.borderRadius='2px';bar.style.marginTop='4px';
+  setTimeout(()=>{bar.style.transition='width 1s ease';bar.style.width=val+'%';},500);
+}
+
+function animateCounter(el,target){
+  let current=0;const step=target/60;
+  const t=setInterval(()=>{
+    current+=step;if(current>=target){current=target;clearInterval(t);}
+    el.textContent=Math.floor(current).toLocaleString();
+  },16);
+}
+
+function buildRainfallChart(data){
+  const chart=document.getElementById('rainfallChart');
+  const labels=document.getElementById('rainfallLabels');
+  chart.innerHTML='';labels.innerHTML='';
+  const max=Math.max(...data);
+  data.forEach((v,i)=>{
+    const h=Math.max((v/max)*80,2);
+    const bar=document.createElement('div');
+    bar.className='rainBar';
+    bar.style.height='0px';
+    bar.innerHTML=`<div class="rainBarVal">${v}mm</div>`;
+    chart.appendChild(bar);
+    setTimeout(()=>{bar.style.transition='height 0.8s cubic-bezier(0.4,0,0.2,1)';bar.style.height=h+'px';},i*50);
+    const lbl=document.createElement('div');
+    lbl.className='rainBarLabel';lbl.style.flex='1';lbl.style.fontSize='9px';lbl.style.color='rgba(42,125,58,0.6)';lbl.style.textAlign='center';
+    lbl.textContent=months[i].slice(0,1);labels.appendChild(lbl);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   CULTIVATION PLANNER
+═══════════════════════════════════════════════ */
+const CROP_DB={
+  'Boro Rice':{icon:'🌾',type:'Cereal',season:'Nov–May',duration:145,water:'High',waterMm:1200,yieldRange:[5,7],pricePerTon:18000,diff:'Medium',investPerBigha:35000,suitScore:{rangpur:90,rajshahi:75,mymensingh:88,sylhet:60,dhaka:82,khulna:65,barisal:85,chattogram:58},limitations:['High water consumption','Labour intensive','Cold-sensitive early stage'],tips:['Use BRRI dhan28/29 certified seed','Apply urea in 3 split doses','Maintain 5 cm standing water depth'],inputs:{seed:'40 kg/ha',urea:'250 kg/ha',tsp:'100 kg/ha',mop:'80 kg/ha',labor:120,irrigations:35},seasons:['Rabi']},
+  'Aman Rice':{icon:'🌾',type:'Cereal',season:'Jul–Nov',duration:120,water:'Medium',waterMm:900,yieldRange:[3,5],pricePerTon:17000,diff:'Easy',investPerBigha:22000,suitScore:{rangpur:82,rajshahi:70,mymensingh:85,sylhet:78,dhaka:80,khulna:72,barisal:88,chattogram:75},limitations:['Flood risk in August–September','Lower yield than Boro'],tips:['Choose flood-tolerant varieties','Transplant before July 20','Monitor for brown planthopper'],inputs:{seed:'30 kg/ha',urea:'180 kg/ha',tsp:'70 kg/ha',mop:'60 kg/ha',labor:95,irrigations:8},seasons:['Kharif']},
+  'Wheat':{icon:'🌿',type:'Cereal',season:'Nov–Mar',duration:105,water:'Low',waterMm:450,yieldRange:[3,4.5],pricePerTon:22000,diff:'Easy',investPerBigha:20000,suitScore:{rangpur:88,rajshahi:85,mymensingh:70,sylhet:30,dhaka:65,khulna:40,barisal:60,chattogram:35},limitations:['Temperature >25°C reduces yield','Not for humid delta areas'],tips:['Sow before Nov 30 for best results','Use BARI Wheat-26 or 28','Apply 2nd irrigation at flag-leaf stage'],inputs:{seed:'120 kg/ha',urea:'200 kg/ha',tsp:'80 kg/ha',mop:'60 kg/ha',labor:75,irrigations:4},seasons:['Rabi']},
+  'Maize':{icon:'🌽',type:'Cereal',season:'Oct–Feb',duration:100,water:'Medium',waterMm:600,yieldRange:[7,10],pricePerTon:15000,diff:'Easy',investPerBigha:28000,suitScore:{rangpur:85,rajshahi:80,mymensingh:82,sylhet:55,dhaka:75,khulna:50,barisal:65,chattogram:60},limitations:['Needs well-drained soil','Wind lodging risk'],tips:['Use hybrid variety for max yield','Earthing-up at knee height','Detassel for seed production'],inputs:{seed:'25 kg/ha',urea:'300 kg/ha',tsp:'110 kg/ha',mop:'80 kg/ha',labor:85,irrigations:5},seasons:['Rabi','Kharif']},
+  'Potato':{icon:'🥔',type:'Vegetable',season:'Oct–Jan',duration:90,water:'Medium',waterMm:500,yieldRange:[20,30],pricePerTon:8000,diff:'Difficult',investPerBigha:60000,suitScore:{rangpur:92,rajshahi:78,mymensingh:75,sylhet:45,dhaka:70,khulna:35,barisal:55,chattogram:40},limitations:['High input cost','Cold storage needed','Late blight disease risk'],tips:['Use certified seed tubers only','Hilling is essential for tuber formation','Harvest before day temperature hits 30°C'],inputs:{seed:'2000 kg/ha',urea:'200 kg/ha',tsp:'100 kg/ha',mop:'150 kg/ha',labor:150,irrigations:6},seasons:['Rabi']},
+  'Mustard':{icon:'🌼',type:'Oilseed',season:'Oct–Jan',duration:85,water:'Low',waterMm:300,yieldRange:[1.2,1.8],pricePerTon:35000,diff:'Easy',investPerBigha:12000,suitScore:{rangpur:85,rajshahi:88,mymensingh:78,sylhet:40,dhaka:75,khulna:55,barisal:70,chattogram:45},limitations:['Low yield tonnage','Aphid attack risk','Needs dry harvest weather'],tips:['Sow Oct 15–Nov 15 window','Apply boron at flowering','Harvest at 75% pod yellowing'],inputs:{seed:'8 kg/ha',urea:'120 kg/ha',tsp:'60 kg/ha',mop:'40 kg/ha',labor:55,irrigations:2},seasons:['Rabi']},
+  'Jute':{icon:'🌿',type:'Fibre',season:'Mar–Jul',duration:120,water:'Medium',waterMm:800,yieldRange:[2.5,3.5],pricePerTon:28000,diff:'Easy',investPerBigha:18000,suitScore:{rangpur:80,rajshahi:72,mymensingh:85,sylhet:50,dhaka:82,khulna:58,barisal:88,chattogram:55},limitations:['Retting water quality matters','Market price volatile','Labour intensive'],tips:['Sow with first rains of March','Thin to 7–8 cm spacing','Ret in clean slow-moving water 18–20 days'],inputs:{seed:'7 kg/ha',urea:'120 kg/ha',tsp:'50 kg/ha',mop:'40 kg/ha',labor:95,irrigations:2},seasons:['Kharif']},
+  'Tomato':{icon:'🍅',type:'Vegetable',season:'Sep–Feb',duration:90,water:'Medium',waterMm:600,yieldRange:[25,40],pricePerTon:15000,diff:'Difficult',investPerBigha:55000,suitScore:{rangpur:82,rajshahi:78,mymensingh:80,sylhet:55,dhaka:85,khulna:45,barisal:60,chattogram:58},limitations:['Viral disease risk','Cold causes flower drop','Staking & trellising needed'],tips:['Use disease-resistant hybrid varieties','Drip irrigation reduces fungal disease','Mulching conserves moisture and suppresses weeds'],inputs:{seed:'250 g/ha',urea:'180 kg/ha',tsp:'120 kg/ha',mop:'100 kg/ha',labor:180,irrigations:20},seasons:['Rabi']},
+  'Vegetables (Mixed)':{icon:'🥦',type:'Vegetable',season:'Oct–Mar',duration:75,water:'Low',waterMm:400,yieldRange:[15,25],pricePerTon:20000,diff:'Medium',investPerBigha:40000,suitScore:{rangpur:85,rajshahi:82,mymensingh:85,sylhet:65,dhaka:90,khulna:55,barisal:72,chattogram:70},limitations:['Price fluctuates seasonally','Intensive pest management','Frequent harvesting required'],tips:['Rotate crops each season to break pest cycles','Use raised beds in flood-prone areas','Mixed cropping reduces overall risk'],inputs:{seed:'Various',urea:'150 kg/ha',tsp:'80 kg/ha',mop:'80 kg/ha',labor:160,irrigations:12},seasons:['Rabi','Kharif']},
+  'Banana':{icon:'🍌',type:'Fruit',season:'Year-round',duration:365,water:'Medium',waterMm:1000,yieldRange:[30,50],pricePerTon:12000,diff:'Medium',investPerBigha:35000,suitScore:{rangpur:70,rajshahi:65,mymensingh:82,sylhet:75,dhaka:78,khulna:55,barisal:85,chattogram:70},limitations:['Wind damage risk','Long investment period','High potassium demand'],tips:['Use tissue-culture plantlets for disease-free start','Desuckering to 1 ratoon keeps yield high','Apply heavy potassium at bunch emergence'],inputs:{seed:'1100 plants/ha',urea:'300 kg/ha',tsp:'150 kg/ha',mop:'250 kg/ha',labor:140,irrigations:15},seasons:['Year-round']},
+  'Tea':{icon:'🍵',type:'Plantation',season:'Mar–Nov',duration:365,water:'High',waterMm:2000,yieldRange:[2,3],pricePerTon:120000,diff:'Difficult',investPerBigha:200000,suitScore:{rangpur:15,rajshahi:10,mymensingh:30,sylhet:95,dhaka:20,khulna:10,barisal:15,chattogram:90},limitations:['Only viable on acidic hilly soils pH 4.5–5.5','High initial investment, 2–3 yrs to harvest','Very specialist management required'],tips:['Plant shade trees before tea bushes','Pruning cycle every 3 years for yield','Process within 24 hrs of plucking for quality'],inputs:{seed:'10000 cuttings/ha',urea:'200 kg/ha',tsp:'80 kg/ha',mop:'150 kg/ha',labor:250,irrigations:0},seasons:['Year-round']},
+};
+const SEASONS_DEF={
+  Rabi:{icon:'🌤',name:'Rabi — Winter',months:'Oct – Mar',desc:'Cereals, vegetables, oilseeds'},
+  Kharif:{icon:'🌧',name:'Kharif — Monsoon',months:'Apr – Sep',desc:'Rice, jute, maize'},
+  'Year-round':{icon:'🌿',name:'Year-round',months:'All months',desc:'Perennial & flexible crops'},
+};
+const CROP_COLORS=['#18a34a','#2d9e52','#1a6b35','#3db868','#0d7a40','#52c878','#45b360','#166332','#1e8c3a','#4dba6e','#0e5c2f','#3da862'];
+const CROP_MONTHS_MAP={
+  'Boro Rice':[11,12,1,2,3,4,5],'Aman Rice':[7,8,9,10,11],'Wheat':[11,12,1,2,3],
+  'Maize':[10,11,12,1,2],'Potato':[10,11,12,1],'Mustard':[10,11,12,1],
+  'Jute':[3,4,5,6,7],'Tomato':[9,10,11,12,1,2],'Vegetables (Mixed)':[10,11,12,1,2,3],
+  'Banana':[1,2,3,4,5,6,7,8,9,10,11,12],'Tea':[3,4,5,6,7,8,9,10,11],
+};
+const MON_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+let PS={step:1,region:'',area:1,unit:'bigha',season:null,plan:[],dragItem:null};
+
+function openPlanner(){
+  PS={step:1,region:selectedRegion||'',area:1,unit:'bigha',season:null,plan:[],dragItem:null};
+  document.getElementById('plannerOverlay').classList.add('active');
+  buildPS1();updatePDots();setPNavNext();
+}
+function closePlanner(){
+  const ov=document.getElementById('plannerOverlay');
+  ov.classList.add('closing');
+  setTimeout(()=>{ov.classList.remove('active','closing');},480);
+}
+function updatePDots(){
+  document.querySelectorAll('#pProgress .pDot').forEach((d,i)=>{
+    d.classList.remove('active','done');
+    if(i+1===PS.step)d.classList.add('active');else if(i+1<PS.step)d.classList.add('done');
+  });
+  document.querySelectorAll('#pProgress .pLine').forEach((l,i)=>l.classList.toggle('done',i+1<PS.step));
+}
+function setPNavNext(){
+  const btn=document.getElementById('pNavNext');
+  const ok=(PS.step===1&&PS.season)||(PS.step===2&&PS.plan.length>0)||(PS.step>=3);
+  btn.disabled=!ok;
+  btn.textContent=PS.step===4?'✓ Finish':'Continue →';
+}
+function plannerNext(){
+  if(PS.step===1){PS.region=document.getElementById('pRegSel').value;PS.area=parseFloat(document.getElementById('pAreaIn').value)||1;}
+  if(PS.step===4){closePlanner();return;}
+  goPS(PS.step+1);
+}
+function goPS(n){
+  const cur=document.getElementById('pS'+(PS.step==='2'?'2':PS.step));
+  cur.classList.add('exit');
+  setTimeout(()=>{
+    cur.classList.remove('active','exit');
+    PS.step=n;updatePDots();
+    if(n===2)buildPS2();else if(n===3)buildPS3();else if(n===4)buildPS4();
+    const next=document.getElementById('pS'+n);
+    next.style.transform='translateX(32px)';next.style.opacity='0';
+    next.classList.add('active');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{next.style.transform='';next.style.opacity='';}));
+    setPNavNext();
+  },240);
+}
+
+/* ─ STEP 1 ─ */
+function buildPS1(){
+  const opts=Object.entries(REGIONS).map(([k,r])=>`<option value="${k}"${PS.region===k?' selected':''}>${r.icon} ${r.name}</option>`).join('');
+  document.getElementById('pS1').innerHTML=`
+  <div class="pS1Inner">
+    <div class="pStepHeading">🌱 Plan Your Cultivation</div>
+    <div class="pStepHint">Tell us where your land is, how big it is, and what season you're planning for.</div>
+    <div class="pFormGroup">
+      <div class="pLabel">Division / Region</div>
+      <select class="pSelect" id="pRegSel"><option value="">— Select Division —</option>${opts}</select>
+    </div>
+    <div class="pFormGroup">
+      <div class="pLabel">Land Area</div>
+      <div class="pAreaRow">
+        <input class="pInput" type="number" id="pAreaIn" value="${PS.area}" min="0.1" step="0.1" placeholder="e.g. 2">
+        <div class="pUnit">${['Bigha','Acre','Hectare'].map(u=>`<button class="pUnitBtn${PS.unit===u.toLowerCase()?' active':''}" onclick="setPUnit('${u.toLowerCase()}',this)">${u}</button>`).join('')}</div>
+      </div>
+    </div>
+    <div class="pFormGroup">
+      <div class="pLabel">Growing Season</div>
+      <div class="pSeasonGrid">${Object.entries(SEASONS_DEF).map(([k,s])=>`
+        <div class="pSeasonCard${PS.season===k?' sel':''}" onclick="setPSeason('${k}',this)">
+          <div class="pSeasonIcon">${s.icon}</div>
+          <div class="pSeasonName">${s.name}</div>
+          <div class="pSeasonDesc">${s.months}<br>${s.desc}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+function setPUnit(u,btn){PS.unit=u;document.querySelectorAll('.pUnitBtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+function setPSeason(s,el){PS.season=s;document.querySelectorAll('.pSeasonCard').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');setPNavNext();}
+
+/* ─ STEP 2 drag-drop ─ */
+function buildPS2(){
+  const dc={'Easy':'#18a34a','Medium':'#c47f00','Difficult':'#d32f2f'};
+  const wc={'Low':'#18a34a','Medium':'#c47f00','High':'#1a7abf'};
+  let crops=Object.entries(CROP_DB)
+    .map(([n,d],i)=>({n,d,score:PS.region?(d.suitScore[PS.region]||50):70,ci:i}))
+    .filter(c=>PS.season==='Year-round'||c.d.seasons.includes(PS.season)||c.d.seasons.includes('Year-round'))
+    .sort((a,b)=>b.score-a.score);
+  if(!crops.length)crops=Object.entries(CROP_DB).map(([n,d],i)=>({n,d,score:70,ci:i}));
+  document.getElementById('dGrid').innerHTML=crops.map(({n,d,score,ci})=>`
+    <div class="dCard${PS.plan.includes(n)?' used':''}" id="dc_${n.replace(/\s/g,'_')}"
+      draggable="true"
+      ondragstart="onDragStart(event,'${n}')"
+      ondragend="onDragEnd(event)">
+      <div class="dScore">${score}%</div>
+      <div class="dCardIcon">${d.icon}</div>
+      <div class="dCardName">${n}</div>
+      <div class="dCardMeta">${d.type} · ${d.season}<br>
+        <span style="color:${dc[d.diff]};font-weight:600">⚡${d.diff}</span> &nbsp;
+        <span style="color:${wc[d.water]};font-weight:600">💧${d.water}</span>
+      </div>
+    </div>`).join('');
+  refreshDropZone();
+  document.getElementById('planSub').textContent=`${PS.region?REGIONS[PS.region].name:'Your area'} · ${SEASONS_DEF[PS.season]?.months||''} · ${PS.area} ${PS.unit}`;
+}
+function onDragStart(e,name){
+  PS.dragItem=name;
+  e.dataTransfer.effectAllowed='copy';
+  setTimeout(()=>{const el=document.getElementById('dc_'+name.replace(/\s/g,'_'));if(el)el.classList.add('dragging');},10);
+}
+function onDragEnd(e){
+  document.querySelectorAll('.dCard').forEach(c=>c.classList.remove('dragging'));
+  document.getElementById('dropZone').classList.remove('over');
+}
+function onDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('over');
+  const name=PS.dragItem;if(!name||PS.plan.includes(name))return;
+  PS.plan.push(name);
+  const el=document.getElementById('dc_'+name.replace(/\s/g,'_'));if(el)el.classList.add('used');
+  refreshDropZone();setPNavNext();
+}
+function removePlanItem(name){
+  PS.plan=PS.plan.filter(n=>n!==name);
+  const el=document.getElementById('dc_'+name.replace(/\s/g,'_'));if(el)el.classList.remove('used');
+  refreshDropZone();setPNavNext();
+}
+function refreshDropZone(){
+  const dz=document.getElementById('dropZone');
+  const empty=document.getElementById('dzEmpty');
+  if(!PS.plan.length){if(empty)empty.style.display='flex';return;}
+  if(empty)empty.style.display='none';
+  const items=PS.plan.map((n,i)=>{
+    const c=CROP_DB[n];const col=CROP_COLORS[i%CROP_COLORS.length];
+    return `<div class="planItem">
+      <span style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></span>
+      <span class="piIcon">${c.icon}</span>
+      <div><div class="piName">${n}</div><div class="piMeta">${c.season} · ${c.duration} days · ${c.water} water</div></div>
+      <button class="piDel" onclick="removePlanItem('${n}')">✕</button>
+    </div>`;
+  }).join('');
+  const existing=dz.querySelectorAll('.planItem');existing.forEach(e=>e.remove());
+  dz.insertAdjacentHTML('beforeend',items);
+}
+
+/* ─ STEP 3 cropping pattern calendar ─ */
+function buildPS3(){
+  const ha=pHa();
+  const region=PS.region?REGIONS[PS.region].name:'Your area';
+  const calRows=PS.plan.map((name,i)=>{
+    const c=CROP_DB[name];const col=CROP_COLORS[i%CROP_COLORS.length];
+    const mns=CROP_MONTHS_MAP[name]||[];
+    const cells=Array.from({length:12},(_,m)=>{
+      const mon=m+1;const on=mns.includes(mon);
+      const isFirst=on&&!mns.includes(mon===1?12:mon-1);
+      const isLast=on&&!mns.includes(mon===12?1:mon+1);
+      const cls=on?`calCell on${isFirst?' fs':''}${isLast?' ls':''}${mns.length===1?' only':''}`:'calCell';
+      const style=on?`background:${col}`:'';
+      return `<div class="${cls}" style="${style}"></div>`;
+    }).join('');
+    return `<div class="calLabel"><div class="calDot" style="background:${col}"></div>${c.icon} ${name}</div>${cells}`;
+  }).join('');
+  const notes=buildRotationNotes();
+  document.getElementById('pS3').innerHTML=`
+  <div style="max-width:900px;margin:0 auto;width:100%">
+    <div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:6px">📅 Cropping Pattern</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:24px">${region} · ${PS.area} ${PS.unit} · ${PS.plan.length} crop${PS.plan.length>1?'s':''} planned</div>
+    <div class="calSec">
+      <div class="calTitle">Annual Growing Calendar</div>
+      <div class="calWrap">
+        <div class="calGrid">
+          <div class="calHdr"></div>${MON_NAMES.map(m=>`<div class="calHdr">${m}</div>`).join('')}
+          ${calRows}
+        </div>
+      </div>
+    </div>
+    <div class="rotBox">${notes}</div>
+  </div>`;
+}
+function buildRotationNotes(){
+  if(!PS.plan.length)return'No crops selected.';
+  const types=[...new Set(PS.plan.map(n=>CROP_DB[n]?.type))];
+  let notes=`<strong>🌿 Your ${PS.plan.length}-crop plan for ${PS.area} ${PS.unit}:</strong><br>`;
+  PS.plan.forEach((n,i)=>{const c=CROP_DB[n];notes+=`${CROP_COLORS[i%CROP_COLORS.length]?'●':''} <strong>${n}</strong> — ${c.season}, ${c.duration} days, ${c.water} water demand<br>`;});
+  if(PS.plan.length>1){
+    notes+=`<br><strong>🔄 Rotation advice:</strong> `;
+    const hasRice=PS.plan.some(n=>n.includes('Rice'));
+    const hasLegume=PS.plan.some(n=>['Mustard','Jute','Vegetables (Mixed)'].includes(n));
+    if(hasRice&&hasLegume)notes+='Excellent rotation — legume/oilseed crop will restore soil nitrogen after rice.';
+    else if(hasRice)notes+='Consider adding a legume crop (mustard/lentil) in your next cycle to restore soil nitrogen.';
+    else notes+='Good diversity — rotating between crop families reduces pest buildup and maintains soil health.';
+  }
+  return notes;
+}
+
+/* ─ STEP 4 outcome ─ */
+function pHa(){const a=PS.area;if(PS.unit==='hectare')return a;if(PS.unit==='acre')return a*0.4047;return a*0.0809;}
+function buildPS4(){
+  const ha=pHa();
+  const region=PS.region?REGIONS[PS.region].name:'Your area';
+  let totalYieldMin=0,totalYieldMax=0,totalWater=0;
+  PS.plan.forEach(n=>{const c=CROP_DB[n];totalYieldMin+=c.yieldRange[0]*ha;totalYieldMax+=c.yieldRange[1]*ha;totalWater+=c.waterMm;});
+  const soilN=Math.round(PS.plan.reduce((s,n)=>s+(CROP_DB[n].suitScore[PS.region]||70),0)/PS.plan.length);
+  const cropRows=PS.plan.map((n,i)=>{
+    const c=CROP_DB[n];const col=CROP_COLORS[i%CROP_COLORS.length];
+    const yMin=(c.yieldRange[0]*ha).toFixed(1),yMax=(c.yieldRange[1]*ha).toFixed(1);
+    const pct=Math.min((c.yieldRange[1]/10)*100,100);
+    return `<div class="ocCropRow">
+      <div class="ocCropDot" style="background:${col}"></div>
+      <div class="ocCropIcon">${c.icon}</div>
+      <div>
+        <div class="ocCropName">${n}</div>
+        <div class="ocCropSub">${c.type} · ${c.season} · ${c.duration} days</div>
+        <div style="font-size:11px;color:#c47f00;margin-top:4px">⚠ ${c.limitations[0]}</div>
+      </div>
+      <div class="ocCropRight">
+        <div class="ocCropYield">${yMin}–${yMax} t</div>
+        <div class="ocCropWater">💧 ${c.waterMm} mm/season</div>
+        <div class="ocYieldBar"><div class="ocYieldFill" data-w="${pct}%" style="background:${col}"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  const soilItems=[
+    {label:'Overall Suitability',val:soilN+'%',pct:soilN,col:'var(--green4)'},
+    {label:'Water Efficiency',val:totalWater<1500?'Good':'High demand',pct:totalWater<1000?85:totalWater<1800?60:35,col:'#1a7abf'},
+    {label:'Rotation Quality',val:PS.plan.length>1?'Good':'Single crop',pct:PS.plan.length>2?90:PS.plan.length>1?65:40,col:'var(--green3)'},
+    {label:'Soil Health Impact',val:PS.plan.some(n=>['Mustard','Jute','Vegetables (Mixed)'].includes(n))?'Positive':'Neutral',pct:PS.plan.some(n=>['Mustard','Jute'].includes(n))?80:55,col:'#c47f00'},
+  ];
+  document.getElementById('pS4').innerHTML=`
+  <div style="max-width:900px;margin:0 auto;width:100%">
+    <div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:6px">📊 Projected Outcome</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:24px">${region} · ${PS.area} ${PS.unit} · ${PS.plan.length} crop${PS.plan.length!==1?'s':''}</div>
+    <div class="ocTopGrid">
+      <div class="ocBig"><div class="ocBigIcon">🌾</div><div class="ocBigLabel">Combined Yield</div>
+        <div class="ocBigVal">${totalYieldMin.toFixed(1)}–${totalYieldMax.toFixed(1)}</div><div class="ocBigUnit">tonnes per season</div></div>
+      <div class="ocBig"><div class="ocBigIcon">💧</div><div class="ocBigLabel">Total Water Need</div>
+        <div class="ocBigVal">${totalWater}</div><div class="ocBigUnit">mm / season combined</div></div>
+      <div class="ocBig"><div class="ocBigIcon">🔄</div><div class="ocBigLabel">Crop Diversity</div>
+        <div class="ocBigVal">${[...new Set(PS.plan.map(n=>CROP_DB[n].type))].length}</div><div class="ocBigUnit">crop type${[...new Set(PS.plan.map(n=>CROP_DB[n].type))].length!==1?'s':''} in plan</div></div>
+    </div>
+    <div class="ocCrops">${cropRows}</div>
+    <div class="soilSection">
+      <div class="soilSTitle">🌍 Agronomic Assessment</div>
+      <div class="soilBars">${soilItems.map(s=>`
+        <div class="soilBarRow">
+          <div class="soilBarLabel">${s.label}</div>
+          <div class="soilBarTrack"><div class="soilBarFill" data-w="${s.pct}%" style="background:${s.col}"></div></div>
+          <div class="soilBarVal" style="color:${s.col}">${s.val}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+  setTimeout(()=>{
+    document.querySelectorAll('.ocYieldFill,.soilBarFill').forEach(el=>{el.style.width=el.dataset.w;});
+  },300);
+}
+
+/* ═══════════════════════════════════════════════
+   CARD DETAIL MODAL
+═══════════════════════════════════════════════ */
+function mRow(label,val,color,pct){
+  const barHtml=pct!==undefined?`<div class="mBar"><div class="mBarFill" data-w="${Math.min(pct,100)}%" style="background:${color||'var(--green3)'}"></div></div>`:'';
+  return `<div class="mRow"><div><div class="mLabel">${label}</div>${barHtml}</div><div class="mVal" style="color:${color||'var(--green)'}">${val}</div></div>`;
+}
+
+function showCardModal(html,title,sub,icon){
+  const modal=document.getElementById('cardModal');
+  const content=document.getElementById('cardModalContent');
+  content.innerHTML=`<div class="mTitle">${icon?icon+' ':''}${title}</div><div class="mSub">${sub||''}</div>${html}`;
+  modal.classList.remove('closing');
+  modal.classList.add('active');
+  content.querySelectorAll('.mRow').forEach((r,i)=>{r.style.animationDelay=(i*0.055+0.1)+'s';});
+  setTimeout(()=>{
+    content.querySelectorAll('.mBarFill').forEach(b=>{b.style.width=b.dataset.w;});
+  },350);
+}
+
+function closeCardModal(force){
+  const modal=document.getElementById('cardModal');
+  if(!force&&!modal.classList.contains('active'))return;
+  modal.classList.add('closing');
+  setTimeout(()=>{modal.classList.remove('active','closing');},300);
+}
+
+function handleModalBackdrop(e){
+  if(e.target===document.getElementById('cardModal'))closeCardModal(true);
+}
+
+function attachCardClicks(){
+  if(!selectedRegion)return;
+  const d=REGIONS[selectedRegion];
+
+  // ── STAT CARDS ──
+  const statDefs=[
+    {label:'Total Area',icon:'🗺',sub:'Land coverage & composition',detail:d=>[
+      mRow('Total Area (km²)',d.area.toLocaleString(),'var(--green3)',Math.min(d.area/400,100)),
+      mRow('Cultivable Land',d.cultLand+'%','var(--green4)',d.cultLand),
+      mRow('Water Bodies',d.waterBodies+'%','var(--blue3)',d.waterBodies),
+      mRow('Forest Cover',d.forest+'%','var(--green2)',d.forest),
+      mRow('Other Land',(100-d.cultLand-d.waterBodies-d.forest)+'%','var(--amber)',Math.max(0,100-d.cultLand-d.waterBodies-d.forest)),
+    ].join('')},
+    {label:'Cultivable Land',icon:'🌱',sub:'Agricultural land utilisation',detail:d=>[
+      mRow('Cultivable %',d.cultLand+'%','var(--green4)',d.cultLand),
+      mRow('Irrigation Coverage',d.irrigation+'%','var(--green3)',d.irrigation),
+      mRow('Crop Suitability Score',d.cropSuit+'%','var(--amber)',d.cropSuit),
+      mRow('Soil Health Index',d.soilHealth+'%','var(--cyan)',d.soilHealth),
+    ].join('')},
+    {label:'Water Bodies',icon:'💧',sub:'Surface water distribution',detail:d=>[
+      mRow('Water Body Cover',d.waterBodies+'%','var(--blue3)',d.waterBodies),
+      mRow('Total Ponds',d.ponds+'k','var(--blue4)',Math.min(d.ponds,100)),
+      mRow('River/Canal Length',d.rivers+' km','var(--cyan)',Math.min(d.rivers/15,100)),
+      mRow('Surface Water Level',d.swLevel+'%','var(--cyan2)',d.swLevel),
+    ].join('')},
+    {label:'Pond Count',icon:'🏞',sub:'Pond & storage infrastructure',detail:d=>[
+      mRow('Total Ponds',d.ponds+'k ponds','var(--blue4)',Math.min(d.ponds,100)),
+      mRow('Primary Source',d.swSource,'var(--cyan)'),
+      mRow('Surface Water',d.swLevel+'%','var(--blue3)',d.swLevel),
+      mRow('Groundwater Level',d.gwLevel+'%','var(--blue2)',d.gwLevel),
+    ].join('')},
+    {label:'River & Canal',icon:'🌊',sub:'Waterway network detail',detail:d=>[
+      mRow('Total Length',d.rivers+' km','var(--blue3)',Math.min(d.rivers/15,100)),
+      mRow('Primary River',d.swSource,'var(--cyan)'),
+      mRow('Peak Availability',d.swSeason,'var(--blue4)'),
+      mRow('Surface Water Index',d.swLevel+'%','var(--cyan2)',d.swLevel),
+    ].join('')},
+    {label:'Forest Cover',icon:'🌳',sub:'Green canopy & ecosystem',detail:d=>[
+      mRow('Forest Coverage',d.forest+'%','var(--green2)',d.forest),
+      mRow('Organic Matter (soil)',d.orgMatter+'%','var(--green3)',d.orgMatter),
+      mRow('Carbon Sequestration',d.forest>15?'High':'Moderate','var(--green4)'),
+      mRow('Biodiversity Index',d.soilHealth>65?'Rich':'Moderate','var(--cyan)'),
+    ].join('')},
+  ];
+  document.querySelectorAll('#landGrid .statCard').forEach((card,i)=>{
+    card.style.cursor='pointer';
+    card.onclick=()=>{if(!selectedRegion)return;const def=statDefs[i];if(def)showCardModal(def.detail(REGIONS[selectedRegion]),def.label,def.sub,def.icon);};
+  });
+
+  // ── CIRCLE CARDS ──
+  const circleDefs=[
+    {label:'Irrigation Coverage',icon:'💦',sub:'Water delivery system overview',detail:d=>[
+      mRow('Coverage',d.irrigation+'%','var(--green4)',d.irrigation),
+      mRow('Primary Method',d.irrigMethod,'var(--green3)'),
+      mRow('Water Requirement',d.waterReq,'var(--blue4)'),
+      mRow('System Efficiency',d.irrigEff,'var(--cyan)'),
+      mRow('Primary Source',d.irrigSource,'var(--blue3)'),
+    ].join('')},
+    {label:'Groundwater Availability',icon:'🌊',sub:'Subsurface aquifer assessment',detail:d=>[
+      mRow('Availability Index',d.groundwater+'%','var(--blue4)',d.groundwater),
+      mRow('Depth Range',d.gwDepth,'var(--blue3)'),
+      mRow('Current Level',d.gwLevel+'%','var(--cyan)',d.gwLevel),
+      mRow('Recharge Trend',d.gwTrend,'var(--amber)'),
+    ].join('')},
+    {label:'Crop Suitability',icon:'🌾',sub:'Agro-climatic compatibility',detail:d=>[
+      mRow('Overall Score',d.cropSuit+'%','var(--amber)',d.cropSuit),
+      mRow('Soil Type',d.soilType,'var(--green4)'),
+      mRow('Soil pH',d.soilPh,'var(--green3)'),
+      mRow('Top Crop',d.crops[0],'var(--amber)'),
+      mRow('Water Requirement',d.waterReq,'var(--blue3)'),
+    ].join('')},
+    {label:'Soil Health Index',icon:'🌍',sub:'Composite soil quality score',detail:d=>[
+      mRow('Health Index',d.soilHealth+'%','var(--cyan)',d.soilHealth),
+      mRow('Nitrogen',d.nitrogen+'%','var(--green4)',d.nitrogen),
+      mRow('Organic Matter',d.orgMatter+'%','var(--amber)',d.orgMatter),
+      mRow('Moisture',d.moisture+'%','var(--blue3)',d.moisture),
+      mRow('Salinity Risk',d.salinity+'%','var(--red)',d.salinity),
+    ].join('')},
+  ];
+  document.querySelectorAll('#circleRow .circleCard').forEach((card,i)=>{
+    card.style.cursor='pointer';
+    card.onclick=()=>{if(!selectedRegion)return;const def=circleDefs[i];if(def)showCardModal(def.detail(REGIONS[selectedRegion]),def.label,def.sub,def.icon);};
+  });
+
+  // ── WATER CARDS ──
+  document.querySelectorAll('.waterCard').forEach((card,i)=>{
+    card.style.cursor='pointer';
+    card.onclick=()=>{
+      if(!selectedRegion)return;const d=REGIONS[selectedRegion];
+      if(i===0)showCardModal([
+        mRow('Groundwater Level',d.gwLevel+'%','var(--blue4)',d.gwLevel),
+        mRow('Depth Range',d.gwDepth,'var(--blue3)'),
+        mRow('Trend',d.gwTrend,'var(--amber)'),
+        mRow('Irrigation Use',d.irrigation+'%','var(--green4)',d.irrigation),
+        mRow('Recharge Status',d.gwLevel>60?'Adequate':'Below Average','var(--cyan)'),
+      ].join(''),'Groundwater Level','Subsurface water depth & trend analysis','🌊');
+      else showCardModal([
+        mRow('Surface Water Level',d.swLevel+'%','var(--cyan)',d.swLevel),
+        mRow('Primary Source',d.swSource,'var(--blue3)'),
+        mRow('Season',d.swSeason,'var(--blue4)'),
+        mRow('River/Canal km',d.rivers+' km','var(--cyan2)',Math.min(d.rivers/15,100)),
+        mRow('Water Body Cover',d.waterBodies+'%','var(--blue3)',d.waterBodies),
+      ].join(''),'Surface Water','River & pond availability status','💧');
+    };
+  });
+
+  // ── RAINFALL CARD ──
+  const rainCard=document.querySelector('.rainfallCard');
+  rainCard.style.cursor='pointer';
+  rainCard.onclick=()=>{
+    if(!selectedRegion)return;const d=REGIONS[selectedRegion];
+    const total=d.rainfall.reduce((a,b)=>a+b,0);
+    const max=Math.max(...d.rainfall);const min=Math.min(...d.rainfall);
+    const peakI=d.rainfall.indexOf(max);const minI=d.rainfall.indexOf(min);
+    showCardModal([
+      mRow('Annual Total',total+' mm','var(--blue4)',Math.min(total/25,100)),
+      mRow('Peak Month',months[peakI]+' — '+max+' mm','var(--blue3)',Math.min(max/6,100)),
+      mRow('Driest Month',months[minI]+' — '+min+' mm','var(--amber)',Math.min(min/6,100)),
+      mRow('Monsoon Window','Jun – Sep','var(--cyan)'),
+      mRow('Annual Water Req.',d.waterReq,'var(--green4)'),
+    ].join(''),'Rainfall Pattern','Monthly precipitation analysis','🌧');
+  };
+
+  // ── SOIL CARD ──
+  const soilCard=document.querySelector('.soilCard');
+  soilCard.style.cursor='pointer';
+  soilCard.onclick=()=>{
+    if(!selectedRegion)return;const d=REGIONS[selectedRegion];
+    showCardModal([
+      mRow('Soil Type',d.soilType,'var(--green4)'),
+      mRow('pH Level',d.soilPh,'var(--amber)'),
+      mRow('Nitrogen',d.nitrogen+'%','var(--green4)',d.nitrogen),
+      mRow('Phosphorus',d.phosphorus+'%','var(--blue3)',d.phosphorus),
+      mRow('Potassium',d.potassium+'%','var(--amber)',d.potassium),
+      mRow('Organic Matter',d.orgMatter+'%','var(--cyan)',d.orgMatter),
+      mRow('Moisture',d.moisture+'%','var(--blue4)',d.moisture),
+      mRow('Salinity',d.salinity+'%','var(--red)',d.salinity),
+    ].join(''),'Soil Intelligence','Complete soil composition profile','🌍');
+  };
+
+  // ── RISK CARD ──
+  const riskCard=document.querySelector('.riskCard');
+  riskCard.style.cursor='pointer';
+  riskCard.onclick=()=>{
+    if(!selectedRegion)return;const d=REGIONS[selectedRegion];
+    const rc=d.riskScore<30?'var(--green4)':d.riskScore<50?'var(--amber)':'var(--red)';
+    showCardModal([
+      mRow('Overall Risk Score',d.riskScore+'%',rc,d.riskScore),
+      mRow('Flood Risk',d.floodRisk,d.floodRisk.includes('High')?'var(--red)':'var(--amber)'),
+      mRow('Drought Risk',d.droughtRisk,d.droughtRisk.includes('High')?'var(--red)':'var(--green4)'),
+      mRow('Waterlogging',d.waterlogRisk,'var(--blue3)'),
+      mRow('Salinity Risk',d.salinityRisk,d.salinityRisk==='Critical'?'var(--red)':'var(--amber)'),
+    ].join(''),'Risk Analysis','Environmental & agricultural risk profile','⚠');
+  };
+
+  // ── IRRIGATION CARD ──
+  const irrigCard=document.querySelector('.irrigCard');
+  irrigCard.style.cursor='pointer';
+  irrigCard.onclick=()=>{
+    if(!selectedRegion)return;const d=REGIONS[selectedRegion];
+    showCardModal([
+      mRow('Coverage',d.irrigation+'%','var(--green4)',d.irrigation),
+      mRow('Water Requirement',d.waterReq,'var(--blue4)'),
+      mRow('Primary Source',d.irrigSource,'var(--blue3)'),
+      mRow('Delivery Method',d.irrigMethod,'var(--cyan)'),
+      mRow('System Efficiency',d.irrigEff,'var(--green3)'),
+    ].join(''),'Irrigation System','Water delivery infrastructure','🚿');
+  };
+
+  // ── CROP CARD ──
+  const cropCard=document.querySelector('.cropCard');
+  cropCard.style.cursor='pointer';
+  cropCard.onclick=()=>{
+    if(!selectedRegion)return;const d=REGIONS[selectedRegion];
+    const clr={primary:'var(--green3)',secondary:'var(--blue3)',tertiary:'var(--amber)'};
+    const chips=d.crops.map((c,i)=>`<span class="mChip" style="border-color:${clr[d.cropTypes[i]||'secondary']};color:${clr[d.cropTypes[i]||'secondary']}">${c}</span>`).join('');
+    showCardModal(`
+      <div class="mSection"><div class="mSectionTitle">Recommended Crops</div><div style="margin-bottom:8px">${chips}</div></div>
+      <div class="mDivider"></div>
+      ${mRow('Suitability Score',d.cropSuit+'%','var(--amber)',d.cropSuit)}
+      ${mRow('Soil Compatibility',d.soilType,'var(--green4)')}
+      ${mRow('Water Requirement',d.waterReq,'var(--blue4)')}
+      ${mRow('Growing Season',d.swSeason,'var(--cyan)')}
+    `,'Crop Intelligence','Suitability-ranked crop profile','🌾');
+  };
+
+  // ── AI CARD ──
+  const aiCard=document.querySelector('.aiCard');
+  aiCard.style.cursor='pointer';
+  aiCard.onclick=()=>{
+    if(!selectedRegion)return;const d=REGIONS[selectedRegion];
+    const actions=(d.aiActions||[]).map(a=>`<span class="mChip" style="border-color:var(--cyan);color:var(--cyan)">→ ${a}</span>`).join('');
+    showCardModal(`
+      <div class="mAiText">${d.ai}</div>
+      <div class="mDivider"></div>
+      <div class="mSection"><div class="mSectionTitle">Recommended Actions</div><div>${actions}</div></div>
+    `,'AI Recommendation Engine','Intelligent agricultural analysis for '+d.name,'🤖');
+  };
+}
+
+/* ═══════════════════════════════════════════════
+   KEYBOARD
+═══════════════════════════════════════════════ */
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(document.getElementById('plannerOverlay').classList.contains('active'))closePlanner();
+    else if(document.getElementById('cardModal').classList.contains('active'))closeCardModal(true);
+    else if(dashOpen)resetView();
+  }
+});
+</script>
+</body>
+</html>
