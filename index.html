@@ -688,6 +688,13 @@ const REGIONS={
 };
 
 const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+/* Human-friendly number formatting: compact (K/M/B) for big values, grouped otherwise */
+function fmtNum(v){
+  v=Number(v)||0;
+  if(Math.abs(v)>=1000) return new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1}).format(v);
+  return new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(v);
+}
+function fmtRange(a,b){const fa=fmtNum(a),fb=fmtNum(b);return fa===fb?fa:`${fa}–${fb}`;}
 let selectedRegion=null,dashOpen=false;
 
 /* ═══════════════════════════════════════════════
@@ -1198,7 +1205,7 @@ function buildPS4(){
   const soilN=Math.round(PS.plan.reduce((s,n)=>s+(CROP_DB[n].suitScore[PS.region]||70),0)/PS.plan.length);
   const cropRows=PS.plan.map((n,i)=>{
     const c=CROP_DB[n];const col=CROP_COLORS[i%CROP_COLORS.length];
-    const yMin=(c.yieldRange[0]*ha).toFixed(1),yMax=(c.yieldRange[1]*ha).toFixed(1);
+    const yMin=c.yieldRange[0]*ha,yMax=c.yieldRange[1]*ha;
     const pct=Math.min((c.yieldRange[1]/10)*100,100);
     return `<div class="ocCropRow">
       <div class="ocCropDot" style="background:${col}"></div>
@@ -1209,7 +1216,7 @@ function buildPS4(){
         <div style="font-size:11px;color:#c47f00;margin-top:4px">⚠ ${c.limitations[0]}</div>
       </div>
       <div class="ocCropRight">
-        <div class="ocCropYield">${yMin}–${yMax} t</div>
+        <div class="ocCropYield">${fmtRange(yMin,yMax)} t</div>
         <div class="ocCropWater">💧 ${c.waterMm} mm/season</div>
         <div class="ocYieldBar"><div class="ocYieldFill" data-w="${pct}%" style="background:${col}"></div></div>
       </div>
@@ -1227,7 +1234,7 @@ function buildPS4(){
     <div style="font-size:13px;color:var(--text2);margin-bottom:24px">${region} · ${PS.area} ${PS.unit} · ${PS.plan.length} crop${PS.plan.length!==1?'s':''}</div>
     <div class="ocTopGrid">
       <div class="ocBig"><div class="ocBigIcon">🌾</div><div class="ocBigLabel">Combined Yield</div>
-        <div class="ocBigVal">${totalYieldMin.toFixed(1)}–${totalYieldMax.toFixed(1)}</div><div class="ocBigUnit">tonnes per season</div></div>
+        <div class="ocBigVal">${fmtRange(totalYieldMin,totalYieldMax)}</div><div class="ocBigUnit">tonnes per season</div></div>
       <div class="ocBig"><div class="ocBigIcon">💧</div><div class="ocBigLabel">Total Water Need</div>
         <div class="ocBigVal">${totalWater}</div><div class="ocBigUnit">mm / season combined</div></div>
       <div class="ocBig"><div class="ocBigIcon">🔄</div><div class="ocBigLabel">Crop Diversity</div>
