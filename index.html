@@ -331,6 +331,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="districts.js"></script>
 <style>
 .leaflet-tooltip-custom { background: #ffffff; color: #1e4d28; border: 1px solid #2d9e52; border-radius: 8px; font-weight: 600; box-shadow: 0 2px 8px rgba(45,158,82,0.15); }
 .leaflet-container { background: transparent; font-family: inherit; }
@@ -413,7 +414,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
     <div class="regionIcon" id="regionIcon">🌾</div>
     <div>
       <div class="regionName" id="regionName">—</div>
-      <div class="regionSub" id="regionSub">Bangladesh • Agricultural Division</div>
+      <div class="regionSub" id="regionSub">Bangladesh • Agricultural District</div>
     </div>
     <div class="aiTag"><div class="aiTagDot"></div>AI ANALYSIS ACTIVE</div>
   </div>
@@ -681,14 +682,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
    REGION DATA
 ═══════════════════════════════════════════════ */
 const REGIONS={
-  rangpur:{name:"Rangpur Division",icon:"🌾",area:16317,cultLand:72,waterBodies:8,ponds:48,rivers:860,forest:3,irrigation:65,groundwater:70,cropSuit:75,soilHealth:68,gwLevel:62,swLevel:55,gwDepth:"4–8m",gwTrend:"Stable",swSource:"Teesta R.",swSeason:"Monsoon",soilType:"Sandy Loam",soilPh:"6.4",nitrogen:68,phosphorus:45,potassium:72,orgMatter:52,moisture:60,salinity:12,rainfall:[18,22,38,72,148,320,410,380,210,82,28,12],riskScore:42,floodRisk:"Moderate",droughtRisk:"Low",waterlogRisk:"Low",salinityRisk:"Very Low",crops:["Boro Rice","Wheat","Maize","Jute","Potato","Mustard","Tobacco"],cropTypes:["primary","primary","primary","secondary","secondary","tertiary","tertiary"],waterReq:"820 mm/yr",irrigSource:"Groundwater",irrigMethod:"STW Pump",irrigEff:"68%",ai:"Rangpur's northern deltaic plains show excellent potential for <span class='aiHighlight'>Boro rice intensification</span>. Soil nitrogen deficiency detected — recommend <span class='aiHighlight'>urea top-dressing</span> in Kharif season. Teesta river water availability is declining; suggest transitioning 20% area to <span class='aiHighlight'>drought-tolerant wheat varieties</span>. Groundwater recharge zones identified near Kurigram; establish <span class='aiHighlight'>3 new aquifer monitoring wells</span>. Cold-wave risk in December–January: deploy <span class='aiHighlight'>micro-irrigation frost protection</span> for potato belt.",aiActions:["Monitor Teesta Flow","Soil Amendment Plan","Cold-Wave Alert System"]},
-  rajshahi:{name:"Rajshahi Division",icon:"🍇",area:18174,cultLand:68,waterBodies:6,ponds:52,rivers:720,forest:5,irrigation:58,groundwater:55,cropSuit:70,soilHealth:60,gwLevel:48,swLevel:40,gwDepth:"6–12m",gwTrend:"Declining",swSource:"Padma R.",swSeason:"Monsoon",soilType:"Clay Loam",soilPh:"6.8",nitrogen:55,phosphorus:60,potassium:65,orgMatter:40,moisture:45,salinity:15,rainfall:[8,12,22,48,92,250,340,290,160,55,14,6],riskScore:58,floodRisk:"Low",droughtRisk:"High",waterlogRisk:"Low",salinityRisk:"Low",crops:["Boro Rice","Mango","Wheat","Silk (Mulberry)","Lentil","Chili","Onion"],cropTypes:["primary","primary","secondary","secondary","secondary","tertiary","tertiary"],waterReq:"650 mm/yr",irrigSource:"Padma River",irrigMethod:"Canal + STW",irrigEff:"55%",ai:"Rajshahi Barind Tract shows <span class='aiHighlight'>critical drought stress</span> — groundwater declining 0.3m/year. Immediate intervention: promote <span class='aiHighlight'>AWD (Alternate Wet & Dry)</span> irrigation to save 30% water. Mango orchards in Chapainawabganj show optimal conditions; recommend <span class='aiHighlight'>precision fertigation</span>. Clay-loam soils have high potassium but low organic matter — integrate <span class='aiHighlight'>green manure crops</span>. Install <span class='aiHighlight'>5 automated weather stations</span> across Barind zone for real-time drought monitoring.",aiActions:["AWD Irrigation Protocol","Drought Emergency Map","Barind Aquifer Report"]},
-  mymensingh:{name:"Mymensingh Division",icon:"🌿",area:10485,cultLand:65,waterBodies:14,ponds:62,rivers:940,forest:8,irrigation:55,groundwater:75,cropSuit:78,soilHealth:72,gwLevel:70,swLevel:68,gwDepth:"3–7m",gwTrend:"Stable",swSource:"Brahmaputra",swSeason:"Year-round",soilType:"Silty Clay",soilPh:"6.2",nitrogen:72,phosphorus:55,potassium:68,orgMatter:65,moisture:72,salinity:8,rainfall:[22,28,52,88,172,380,490,450,240,90,32,16],riskScore:38,floodRisk:"Moderate",droughtRisk:"Very Low",waterlogRisk:"Moderate",salinityRisk:"Very Low",crops:["Boro Rice","Jute","Banana","Pineapple","Turmeric","Ginger","Aquaculture"],cropTypes:["primary","primary","primary","secondary","secondary","secondary","tertiary"],waterReq:"960 mm/yr",irrigSource:"River + Pond",irrigMethod:"Gravity + LLP",irrigEff:"72%",ai:"Mymensingh haor areas have <span class='aiHighlight'>exceptional biodiversity</span> and high soil fertility. Haor flooding window (March–May) limits crop diversity — recommend <span class='aiHighlight'>flash-flood tolerant BRRI dhan51 varieties</span>. High organic matter in silty clay soils supports <span class='aiHighlight'>integrated fish-rice farming</span> — 3,200 ha identified as suitable. Pineapple belt in Madhupur needs <span class='aiHighlight'>precision pH management</span> (target 5.5). Monitor Brahmaputra water levels — flood risk elevated in July–August.",aiActions:["Haor Rice Varieties","Fish-Rice Integration Map","Flood Early Warning"]},
-  sylhet:{name:"Sylhet Division",icon:"🍵",area:12635,cultLand:48,waterBodies:18,ponds:38,rivers:1100,forest:28,irrigation:38,groundwater:80,cropSuit:65,soilHealth:75,gwLevel:82,swLevel:78,gwDepth:"2–5m",gwTrend:"Stable +",swSource:"Surma-Meghna",swSeason:"Year-round",soilType:"Red Sandy",soilPh:"5.2",nitrogen:60,phosphorus:42,potassium:58,orgMatter:78,moisture:82,salinity:5,rainfall:[32,38,78,140,280,520,620,560,340,130,48,24],riskScore:32,floodRisk:"High",droughtRisk:"Very Low",waterlogRisk:"High",salinityRisk:"Very Low",crops:["Tea","Orange","Betel Leaf","Rice","Lemon","Jackfruit","Rubber"],cropTypes:["primary","primary","primary","secondary","secondary","tertiary","tertiary"],waterReq:"1200 mm/yr",irrigSource:"Natural Rain",irrigMethod:"Rain-fed",irrigEff:"N/A",ai:"Sylhet's northeastern hills receive Bangladesh's <span class='aiHighlight'>highest rainfall (4,000+ mm)</span> — optimal for tea cultivation. Acidic red soils (pH 5.2) are perfect for <span class='aiHighlight'>tea, rubber, and citrus</span>. Haor wetlands (Tanguar, Hakaluki) designated as Ramsar sites — <span class='aiHighlight'>sustainable fisheries management</span> critical. Flash flooding from Meghalaya hills is a risk — recommend <span class='aiHighlight'>real-time radar-linked flood alerts</span>. Eco-tourism agriculture integration opportunity identified in Jaflong.",aiActions:["Tea Quality Monitor","Haor Wetland Index","Flash Flood Radar"]},
-  dhaka:{name:"Dhaka Division",icon:"🏙",area:20593,cultLand:55,waterBodies:12,ponds:71,rivers:820,forest:4,irrigation:70,groundwater:58,cropSuit:62,soilHealth:55,gwLevel:52,swLevel:45,gwDepth:"8–15m",gwTrend:"Critical Decline",swSource:"Buriganga R.",swSeason:"Monsoon",soilType:"Alluvial Loam",soilPh:"7.1",nitrogen:48,phosphorus:52,potassium:60,orgMatter:38,moisture:52,salinity:10,rainfall:[12,18,35,62,128,295,380,350,195,72,22,10],riskScore:65,floodRisk:"High",droughtRisk:"Low",waterlogRisk:"High",salinityRisk:"Low",crops:["Boro Rice","Vegetables","Jute","Mustard","Aman Rice","Poultry Integration","Urban Farming"],cropTypes:["primary","primary","secondary","secondary","secondary","tertiary","tertiary"],waterReq:"750 mm/yr",irrigSource:"Groundwater DTW",irrigMethod:"Deep Tubewell",irrigEff:"60%",ai:"Dhaka Division faces <span class='aiHighlight'>critical groundwater depletion</span> — urban expansion reducing recharge zones by 12% annually. Agricultural land conversion risk: <span class='aiHighlight'>18,000 ha threatened by urbanization</span>. Buriganga and Turag rivers show severe pollution — surface water unusable for irrigation. Recommend <span class='aiHighlight'>rooftop and peri-urban farming</span> expansion. High flood waterlogging risk in low-lying chars. Priority action: establish <span class='aiHighlight'>groundwater conservation zones</span> in Gazipur and Manikganj.",aiActions:["Urban Farm Expansion","Groundwater Conservation","Flood Risk Zones"]},
-  khulna:{name:"Khulna Division",icon:"🌲",area:22272,cultLand:52,waterBodies:22,ponds:45,rivers:1260,forest:32,irrigation:45,groundwater:42,cropSuit:58,soilHealth:48,gwLevel:38,swLevel:60,gwDepth:"10–18m",gwTrend:"Saline Intrusion",swSource:"Sundarbans Channels",swSeason:"Tidal",soilType:"Saline Clay",soilPh:"7.8",nitrogen:42,phosphorus:48,potassium:70,orgMatter:35,moisture:65,salinity:85,rainfall:[8,14,28,52,108,240,310,280,155,58,16,6],riskScore:72,floodRisk:"High",droughtRisk:"Moderate",waterlogRisk:"Moderate",salinityRisk:"Critical",crops:["Aman Rice","Shrimp Farming","Coconut","Betel Nut","Saline-tolerant Crops","Mangrove Honey","Crab Culture"],cropTypes:["primary","primary","primary","secondary","secondary","tertiary","tertiary"],waterReq:"580 mm/yr",irrigSource:"Tidal / Rainwater",irrigMethod:"Tidal Sluice",irrigEff:"42%",ai:"Khulna Sundarban fringe is under <span class='aiHighlight'>severe salinity stress</span> — 68% of agricultural land affected. Climate change accelerating saltwater intrusion. Recommend <span class='aiHighlight'>BINA dhan10 and BRRI dhan47</span> salt-tolerant varieties immediately. Shrimp-rice integrated farming (gher system) shows <span class='aiHighlight'>340% higher income</span> vs traditional rice. Mangrove carbon credit programs identified — <span class='aiHighlight'>14,000 ha eligible</span>. Cyclone shelter green belts need expansion. Fresh water pond storage critical for dry season.",aiActions:["Salinity Mapping","Gher Farming Expansion","Cyclone Risk Assessment"]},
-  barisal:{name:"Barisal Division",icon:"🌊",area:13297,cultLand:60,waterBodies:26,ponds:88,rivers:1480,forest:6,irrigation:48,groundwater:65,cropSuit:68,soilHealth:62,gwLevel:60,swLevel:72,gwDepth:"5–10m",gwTrend:"Stable",swSource:"Meghna Delta",swSeason:"Year-round",soilType:"Tidal Alluvial",soilPh:"6.6",nitrogen:62,phosphorus:50,potassium:75,orgMatter:58,moisture:75,salinity:22,rainfall:[15,20,42,75,155,320,410,380,220,82,24,10],riskScore:55,floodRisk:"Very High",droughtRisk:"Low",waterlogRisk:"High",salinityRisk:"Moderate",crops:["Aman Rice","Coconut","Betel Leaf","Banana","Hilsa Fisheries","Duck Farming","Floating Garden"],cropTypes:["primary","primary","primary","secondary","secondary","secondary","tertiary"],waterReq:"880 mm/yr",irrigSource:"River/Khal",irrigMethod:"LLP + Tidal",irrigEff:"58%",ai:"Barisal char lands are home to Bangladesh's unique <span class='aiHighlight'>floating garden (Baira)</span> agriculture — over 60,000 ha suitable for expansion. Meghna estuary provides exceptional fish breeding grounds; integrate <span class='aiHighlight'>hilsa sanctuary protection</span> with aquaculture. Tidal alluvial soils are highly fertile but waterlogging is endemic — promote <span class='aiHighlight'>raised bed vegetable cultivation</span>. Coconut belt along Bhola coastline needs <span class='aiHighlight'>cyclone-resistant varieties</span>. Duck farming in flooded fields offers high-protein food security.",aiActions:["Floating Garden Map","Hilsa Sanctuary Zones","Tidal Agriculture Plan"]},
-  chattogram:{name:"Chattogram Division",icon:"⛰",area:33909,cultLand:44,waterBodies:16,ponds:42,rivers:980,forest:38,irrigation:40,groundwater:60,cropSuit:60,soilHealth:65,gwLevel:58,swLevel:62,gwDepth:"5–12m",gwTrend:"Stable",swSource:"Karnaphuli R.",swSeason:"Monsoon",soilType:"Hilly Red Loam",soilPh:"5.8",nitrogen:58,phosphorus:48,potassium:62,orgMatter:70,moisture:68,salinity:18,rainfall:[18,24,55,110,220,480,580,520,310,120,42,16],riskScore:48,floodRisk:"Moderate",droughtRisk:"Low",waterlogRisk:"Low",salinityRisk:"Moderate",crops:["Tea","Rubber","Bamboo","Pineapple","Turmeric","Hill Rice","Cashew"],cropTypes:["primary","primary","primary","secondary","secondary","secondary","tertiary"],waterReq:"900 mm/yr",irrigSource:"Karnaphuli + Rain",irrigMethod:"Rain-fed + Check Dam",irrigEff:"48%",ai:"Chattogram Hill Tracts offer Bangladesh's most diverse <span class='aiHighlight'>agro-ecological zones</span>. CHT tribal communities practice sustainable jhum cultivation — integrate <span class='aiHighlight'>agroforestry systems</span> to prevent land degradation. Kaptai Lake watershed is critical — regulate upstream agricultural runoff. Tea gardens in Rangamati and Bandarban show <span class='aiHighlight'>premium specialty tea potential</span>. Landslide risk during monsoon (June–September) requires <span class='aiHighlight'>terracing and vetiver grass</span> stabilization. Coastal Cox's Bazar: salt-tolerant vegetable cultivation feasible."},aiActions:["CHT Agroforestry Plan","Landslide Risk Zones","Kaptai Water Quality"]
+  manikganj:{name:"Manikganj District",icon:"🌾",area:1379,cultLand:74,waterBodies:11,ponds:34,rivers:420,forest:2,irrigation:72,groundwater:64,cropSuit:78,soilHealth:70,gwLevel:60,swLevel:58,gwDepth:"5–9m",gwTrend:"Stable",swSource:"Padma–Jamuna",swSeason:"Monsoon",soilType:"Alluvial Loam",soilPh:"6.7",nitrogen:66,phosphorus:52,potassium:64,orgMatter:54,moisture:62,salinity:9,rainfall:[12,18,36,66,132,300,392,358,200,76,24,11],riskScore:48,floodRisk:"High",droughtRisk:"Low",waterlogRisk:"Moderate",salinityRisk:"Very Low",crops:["Boro Rice","Mustard","Jute","Vegetables","Aman Rice","Lentil","Onion"],cropTypes:["primary","primary","secondary","secondary","secondary","tertiary","tertiary"],waterReq:"780 mm/yr",irrigSource:"Groundwater STW",irrigMethod:"Shallow Tubewell",irrigEff:"66%",ai:"Manikganj's fertile alluvial plains along the Padma–Jamuna confluence are ideal for <span class='aiHighlight'>intensive Boro rice and mustard rotation</span>. River-bank char lands face annual flood inundation — recommend <span class='aiHighlight'>early-maturing BRRI dhan28 varieties</span>. Groundwater is stable but localized over-extraction near Saturia detected; promote <span class='aiHighlight'>AWD irrigation</span>. Strong potential for <span class='aiHighlight'>winter vegetable expansion</span> for the nearby Dhaka market.",aiActions:["Flood-Safe Cropping Calendar","Vegetable Market Linkage","AWD Irrigation Pilot"]},
+  natore:{name:"Natore District",icon:"🍚",area:1896,cultLand:71,waterBodies:8,ponds:46,rivers:360,forest:3,irrigation:62,groundwater:52,cropSuit:73,soilHealth:62,gwLevel:50,swLevel:42,gwDepth:"7–13m",gwTrend:"Declining",swSource:"Baral River",swSeason:"Monsoon",soilType:"Clay Loam",soilPh:"6.9",nitrogen:57,phosphorus:58,potassium:66,orgMatter:44,moisture:48,salinity:12,rainfall:[9,13,24,50,96,255,345,295,165,58,16,7],riskScore:54,floodRisk:"Low",droughtRisk:"High",waterlogRisk:"Low",salinityRisk:"Low",crops:["Boro Rice","Sugarcane","Mango","Wheat","Lentil","Onion","Garlic"],cropTypes:["primary","primary","primary","secondary","secondary","tertiary","tertiary"],waterReq:"660 mm/yr",irrigSource:"Groundwater DTW",irrigMethod:"Deep Tubewell",irrigEff:"58%",ai:"Natore sits in the Barind fringe and shows <span class='aiHighlight'>moderate drought stress</span> with groundwater declining ~0.2m/year. The Chalan Beel wetland supports rich dry-season cropping — protect with <span class='aiHighlight'>managed water-sharing schemes</span>. Sugarcane belt around Natore Sugar Mill needs <span class='aiHighlight'>drip fertigation</span> to cut water use. Recommend <span class='aiHighlight'>green-manure rotation</span> to lift low organic matter in clay-loam soils.",aiActions:["Chalan Beel Water Plan","Sugarcane Drip Pilot","Barind Drought Monitor"]},
+  khulna:{name:"Khulna District",icon:"🦐",area:4394,cultLand:54,waterBodies:24,ponds:52,rivers:980,forest:30,irrigation:46,groundwater:40,cropSuit:58,soilHealth:50,gwLevel:38,swLevel:62,gwDepth:"10–18m",gwTrend:"Saline Intrusion",swSource:"Rupsha–Bhairab",swSeason:"Tidal",soilType:"Saline Clay",soilPh:"7.7",nitrogen:44,phosphorus:49,potassium:71,orgMatter:36,moisture:66,salinity:82,rainfall:[8,14,29,54,110,242,312,282,156,60,17,7],riskScore:70,floodRisk:"High",droughtRisk:"Moderate",waterlogRisk:"Moderate",salinityRisk:"Critical",crops:["Aman Rice","Shrimp Farming","Coconut","Betel Nut","Saline-tolerant Crops","Crab Culture","Mangrove Honey"],cropTypes:["primary","primary","primary","secondary","secondary","tertiary","tertiary"],waterReq:"590 mm/yr",irrigSource:"Tidal / Rainwater",irrigMethod:"Tidal Sluice",irrigEff:"44%",ai:"Khulna's Sundarban-fringe lands face <span class='aiHighlight'>critical salinity intrusion</span> — over 60% of farmland affected in the dry season. Deploy <span class='aiHighlight'>BINA dhan10 and BRRI dhan47</span> salt-tolerant rice immediately. Integrated <span class='aiHighlight'>shrimp–rice gher systems</span> deliver markedly higher income than mono-rice. Freshwater pond storage and <span class='aiHighlight'>cyclone-resistant green belts</span> are priorities for climate resilience.",aiActions:["Salinity Mapping","Gher Farming Expansion","Cyclone Risk Assessment"]}
 };
 
 const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -781,7 +777,7 @@ function initParticles(){
    MAP INTERACTIONS
 ═══════════════════════════════════════════════ */
 
-let map;
+let map, districtLayer;
 function initRealMap() {
   map = L.map('realMap', {
     zoomControl: false,
@@ -793,29 +789,25 @@ function initRealMap() {
     maxZoom: 19
   }).addTo(map);
 
-  const divisions = {
-    rangpur: { name: "Rangpur Division", lat: 25.7439, lng: 89.2752 },
-    rajshahi: { name: "Rajshahi Division", lat: 24.3636, lng: 88.6241 },
-    mymensingh: { name: "Mymensingh Division", lat: 24.7471, lng: 90.4203 },
-    sylhet: { name: "Sylhet Division", lat: 24.8949, lng: 91.8687 },
-    dhaka: { name: "Dhaka Division", lat: 23.8103, lng: 90.4125 },
-    khulna: { name: "Khulna Division", lat: 22.8456, lng: 89.5403 },
-    barisal: { name: "Barisal Division", lat: 22.7010, lng: 90.3535 },
-    chattogram: { name: "Chattogram Division", lat: 22.3569, lng: 91.7832 }
-  };
+  // District polygons (Manikganj, Natore, Khulna)
+  const baseStyle = { color: '#2d9e52', weight: 1.4, fillColor: '#2d9e52', fillOpacity: 0.18 };
+  const hoverStyle = { color: '#18a34a', weight: 2, fillOpacity: 0.4 };
 
-  for (let key in divisions) {
-    const div = divisions[key];
-    const marker = L.circleMarker([div.lat, div.lng], {
-      color: '#4dcc7a',
-      fillColor: '#4dcc7a',
-      fillOpacity: 0.6,
-      radius: 12
-    }).addTo(map);
-
-    marker.bindTooltip(div.name, { direction: 'top', permanent: false, className: 'leaflet-tooltip-custom' });
-    marker.on('click', () => { selectRegion(key); });
-  }
+  districtLayer = L.geoJSON(window.DISTRICT_GEO, {
+    style: () => baseStyle,
+    onEachFeature: (feature, layer) => {
+      const key = feature.properties.key;
+      const label = feature.properties.district + ' District';
+      layer.bindTooltip(label, { direction: 'top', sticky: true, className: 'leaflet-tooltip-custom' });
+      layer.on('mouseover', () => { if (selectedRegion !== key) layer.setStyle(hoverStyle); });
+      layer.on('mouseout', () => { if (selectedRegion !== key) layer.setStyle(baseStyle); });
+      layer.on('click', () => {
+        districtLayer.setStyle(baseStyle);
+        layer.setStyle({ color: '#18a34a', weight: 2.4, fillColor: '#4dcc7a', fillOpacity: 0.45 });
+        selectRegion(key);
+      });
+    }
+  }).addTo(map);
 }
 
 function selectRegion(region){
@@ -824,12 +816,10 @@ function selectRegion(region){
   document.getElementById('backBtn').classList.add('show');
   
   if(map) {
-    const divisions = {
-      rangpur: [25.7439, 89.2752], rajshahi: [24.3636, 88.6241], mymensingh: [24.7471, 90.4203],
-      sylhet: [24.8949, 91.8687], dhaka: [23.8103, 90.4125], khulna: [22.8456, 89.5403],
-      barisal: [22.7010, 90.3535], chattogram: [22.3569, 91.7832]
+    const districtCenters = {
+      manikganj: [23.8765, 89.9794], natore: [24.4156, 89.0851], khulna: [22.4924, 89.4455]
     };
-    map.flyTo(divisions[region], 7.5, { animate: true, duration: 1.2 });
+    map.flyTo(districtCenters[region], 9, { animate: true, duration: 1.2 });
   }
 
   document.getElementById('mapScene').classList.add('shifted');
@@ -848,6 +838,7 @@ function resetView(){
   document.getElementById('instruction').classList.remove('hide');
   document.getElementById('backBtn').classList.remove('show');
   selectedRegion=null;
+  if(districtLayer) districtLayer.setStyle({ color: '#2d9e52', weight: 1.4, fillColor: '#2d9e52', fillOpacity: 0.18 });
   if(map) {
     map.flyTo([23.6850, 90.3563], 6.4, { animate: true, duration: 1.2 });
     setTimeout(()=>map.invalidateSize(), 1200);
@@ -1057,8 +1048,8 @@ function buildPS1(){
     <div class="pStepHeading">🌱 Plan Your Cultivation</div>
     <div class="pStepHint">Tell us where your land is, how big it is, and what season you're planning for.</div>
     <div class="pFormGroup">
-      <div class="pLabel">Division / Region</div>
-      <select class="pSelect" id="pRegSel"><option value="">— Select Division —</option>${opts}</select>
+      <div class="pLabel">District / Region</div>
+      <select class="pSelect" id="pRegSel"><option value="">— Select District —</option>${opts}</select>
     </div>
     <div class="pFormGroup">
       <div class="pLabel">Land Area</div>
